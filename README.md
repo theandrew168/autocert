@@ -3,9 +3,9 @@ Automatic TLS cert acquisition and renewal for Python web apps
 
 ## Overview
 Autocert is a package for automatically obtaining and renewing TLS certificates from [Let's Encrypt](https://letsencrypt.org/) using the [ACME](https://en.wikipedia.org/wiki/Automated_Certificate_Management_Environment) protocol.
-It is based on the API and design of the [Go](https://golang.org/) package of the same name: [autocert](https://pkg.go.dev/golang.org/x/crypto/acme/autocert).
+It is based on the API and design of the [Go](https://golang.org/) package with the same name: [autocert](https://pkg.go.dev/golang.org/x/crypto/acme/autocert).
 To work its magic, autocert only requires two TCP sockets: one listening on port 80 and another listening on port 443.
-These can come directly from a caller with the ability to listen on privileged ports or from a management system such as [systemd](https://www.freedesktop.org/software/systemd/man/systemd.socket.html).
+These can come directly from an application with the ability to listen on privileged ports or from a management system such as [systemd](https://www.freedesktop.org/software/systemd/man/systemd.socket.html).
 
 ## Install
 If you are unfamiliar with [virtual environments](https://docs.python.org/3/library/venv.html), I suggest taking a brief moment to learn about them and set one up.
