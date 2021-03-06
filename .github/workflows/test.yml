@@ -1,0 +1,23 @@
+name: Test
+
+on: [push, pull_request]
+
+jobs:
+  build:
+    name: Test
+    runs-on: ubuntu-latest
+    steps:
+    - name: Setup python
+      uses: actions/setup-python@v2
+      with:
+        python-version: 3.8
+    - name: Checkout source
+      uses: actions/checkout@v2
+    - name: Install dependencies
+      run: |
+        pip install wheel
+        pip install pytest
+        pip install -e .
+    - name: Run tests
+      run: |
+        pytest
