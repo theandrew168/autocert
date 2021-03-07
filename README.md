@@ -1,5 +1,5 @@
 # autocert
-Automatic TLS cert acquisition and renewal for Python web apps
+Automatic TLS cert issuance and renewal for Python web apps
 
 ## Overview
 Autocert is a package for automatically obtaining and renewing TLS certificates from [Let's Encrypt](https://letsencrypt.org/) using the [ACME](https://en.wikipedia.org/wiki/Automated_Certificate_Management_Environment) protocol.
@@ -32,7 +32,7 @@ s443.bind(('0.0.0.0', 443))
 s443.listen()
 
 # tls_s443 can now be used for serving HTTPS web traffic
-tls_s443 = autocert.do(s80, s443, 'example.org', 'www.example.org')
+tls_s443 = autocert.do(s80, s443, 'example.org', 'www.example.org', accept_tos=True)
 
 # waitress example
 import waitress
@@ -56,7 +56,7 @@ s80 = socket.fromfd(3, socket.AF_INET, socket.SOCK_STREAM)
 s443 = socket.fromfd(4, socket.AF_INET, socket.SOCK_STREAM)
 
 # tls_s443 can now be used for serving HTTPS web traffic
-tls_s443 = autocert.do(s80, s443, 'example.org', 'www.example.org')
+tls_s443 = autocert.do(s80, s443, 'example.org', 'www.example.org', accept_tos=True)
 
 # waitress example
 import waitress
