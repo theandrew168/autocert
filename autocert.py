@@ -31,13 +31,16 @@ when new cert is acquired:
 new clients from accept() should now get the new stuff
 old ones will still have the "old" cert but that's fine (still valid)
 """
+
+import base64
+import json
 import os
 import socket
 import ssl
 
 import appdirs
-from cryptography.hazmat.primitives import serialization
-from cryptography.hazmat.primitives.asymmetric import ed25519
+from cryptography.hazmat.primitives import hashes, serialization
+from cryptography.hazmat.primitives.asymmetric import ec, utils
 import requests
 
 #LETS_ENCRYPT_ACME_URL = 'https://acme-v02.api.letsencrypt.org/directory'
@@ -46,6 +49,10 @@ LETS_ENCRYPT_ACME_URL = 'https://acme-staging-v02.api.letsencrypt.org/directory'
 
 class AutocertError(Exception):
     pass
+
+
+def base64_encode(b):
+    return base64.urlsafe_b64encode(b).decode('utf8').replace('=', '')
 
 
 def do(s80, s443, *domains, accept_tos=False):
@@ -73,22 +80,89 @@ def do(s80, s443, *domains, accept_tos=False):
     pprint(directory)
 
     # generate an EC private key
-    private_key = ed25519.Ed25519PrivateKey.generate()
+    private_key = ec.generate_private_key(ec.SECP256R1())
     private_bytes = private_key.private_bytes(
-        #encoding=serialization.Encoding.Raw,
         encoding=serialization.Encoding.PEM,
-        #format=serialization.PrivateFormat.Raw,
         format=serialization.PrivateFormat.PKCS8,
         encryption_algorithm=serialization.NoEncryption(),
     )
     print(private_bytes.decode())
 
+    # generate an EC public key (from the private key)
     public_key = private_key.public_key()
-    public_bytes = public_key.public_bytes(
-        encoding=serialization.Encoding.PEM,
-        format=serialization.PublicFormat.SubjectPublicKeyInfo,
-    )
-    print(public_bytes.decode())
+    numbers = public_key.public_numbers()
+
+    x = numbers.x
+    x = x.to_bytes((x.bit_length() + 7) // 8, byteorder='big')
+    x = base64_encode(x)
+    print(x)
+
+    y = numbers.y
+    y = y.to_bytes((y.bit_length() + 7) // 8, byteorder='big')
+    y = base64_encode(y)
+    print(y)
+
+    # check if account already exists
+    acct_path = os.path.join(cache_dir, 'acme_account')
+    if not os.path.exists(acct_path):
+        # grab a fresh nonce
+        resp = requests.head(directory['newNonce'])
+        nonce = resp.headers['Replay-Nonce']
+
+        # https://tools.ietf.org/html/draft-ietf-jose-cfrg-curves-06#appendix-A.2
+        protected = {
+            'alg': 'ES256',
+            'jwk': {
+                'kty': 'EC',
+                'crv': 'P-256',
+                'x': x,
+                'y': y,
+            },
+            'nonce': nonce,
+            'url': directory['newAccount'],
+        }
+        protected = json.dumps(protected, separators=(',', ':'), sort_keys=True)
+        protected = base64_encode(protected.encode())
+        print(protected)
+
+        payload = {
+            'termsOfServiceAgreed': accept_tos,
+        }
+        payload = json.dumps(payload, separators=(',', ':'), sort_keys=True)
+        payload = base64_encode(payload.encode())
+        print(payload)
+
+        # https://community.letsencrypt.org/t/parse-error-reading-jws/137654/13
+        signature = private_key.sign('.'.join([protected, payload]).encode(), ec.ECDSA(hashes.SHA256()))
+        r, s = utils.decode_dss_signature(signature)
+        r = r.to_bytes((r.bit_length() + 7) // 8, byteorder='big')
+        s = s.to_bytes((s.bit_length() + 7) // 8, byteorder='big')
+        print(len(r), r)
+        print(len(s), s)
+        signature = base64_encode(r + s)
+        print(signature)
+
+        headers = {
+            'Content-Type': 'application/jose+json',
+        }
+
+        data = {
+            'protected': protected,
+            'payload': payload,
+            'signature': signature,
+        }
+        data = json.dumps(data, separators=(',', ':'))
+        print(data)
+
+        #resp = requests.post(directory['newAccount'], headers=headers, data=data)
+        #print(resp)
+        #print(resp.headers)
+        #print(resp.json())
+    else:
+        print('account already exists:')
+        with open(acct_path) as f:
+            acct = f.read()
+            print(acct)
 
 
 if __name__ == '__main__':
