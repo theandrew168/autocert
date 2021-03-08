@@ -36,6 +36,8 @@ import socket
 import ssl
 
 import appdirs
+from cryptography.hazmat.primitives import serialization
+from cryptography.hazmat.primitives.asymmetric import ed25519
 import requests
 
 #LETS_ENCRYPT_ACME_URL = 'https://acme-v02.api.letsencrypt.org/directory'
@@ -64,8 +66,29 @@ def do(s80, s443, *domains, accept_tos=False):
     if not os.path.exists(cache_dir):
         os.makedirs(cache_dir)
 
-    d = requests.get(LETS_ENCRYPT_ACME_URL)
-    print(d.json())
+    # grab the ACME directory
+    directory = requests.get(LETS_ENCRYPT_ACME_URL)
+    directory = directory.json()
+    from pprint import pprint
+    pprint(directory)
+
+    # generate an EC private key
+    private_key = ed25519.Ed25519PrivateKey.generate()
+    private_bytes = private_key.private_bytes(
+        #encoding=serialization.Encoding.Raw,
+        encoding=serialization.Encoding.PEM,
+        #format=serialization.PrivateFormat.Raw,
+        format=serialization.PrivateFormat.PKCS8,
+        encryption_algorithm=serialization.NoEncryption(),
+    )
+    print(private_bytes.decode())
+
+    public_key = private_key.public_key()
+    public_bytes = public_key.public_bytes(
+        encoding=serialization.Encoding.PEM,
+        format=serialization.PublicFormat.SubjectPublicKeyInfo,
+    )
+    print(public_bytes.decode())
 
 
 if __name__ == '__main__':
