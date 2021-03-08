@@ -15,6 +15,7 @@ setup(
     py_modules=['autocert'],
     install_requires=[
         'appdirs',
+        'cryptography',
         'requests',
     ],
     classifiers=[

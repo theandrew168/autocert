@@ -1,8 +1,10 @@
 """
 https://tools.ietf.org/html/rfc8555
+https://github.com/letsencrypt/boulder/blob/master/docs/acme-divergences.md
 
 https://github.com/golang/crypto/tree/master/acme/autocert
 https://github.com/farrepa/django-autocert/tree/develop/autocert
+https://github.com/diafygi/acme-tiny
 
 https://docs.python.org/3/library/socket.html
 https://docs.python.org/3/library/ssl.html
@@ -36,6 +38,7 @@ import ssl
 import appdirs
 import requests
 
+#LETS_ENCRYPT_ACME_URL = 'https://acme-v02.api.letsencrypt.org/directory'
 LETS_ENCRYPT_ACME_URL = 'https://acme-staging-v02.api.letsencrypt.org/directory'
 
 
@@ -44,15 +47,34 @@ class AutocertError(Exception):
 
 
 def do(s80, s443, *domains, accept_tos=False):
+    # ensure args are valid
     if not accept_tos:
-        raise AutocertError('Terms of Service not accepted')
+        raise AutocertError("CA's Terms of Service must be accepted")
+    if not isinstance(s80, socket.socket):
+        raise AutocertError('Socket s80 must be a socket')
+    if not isinstance(s443, socket.socket):
+        raise AutocertError('Socket s443 must be a socket')
+#    if s80.getsockname()[1] != 80:
+#        raise AutocertError('Socket s80 must be listening on port 80')
+#    if s443.getsockname()[1] != 443:
+#        raise AutocertError('Socket s443 must be listening on port 443')
 
+    # ensure TLS cert cache dir exists
     cache_dir = appdirs.user_cache_dir('python-autocert', 'python-autocert')
-    print(cache_dir)
-
     if not os.path.exists(cache_dir):
         os.makedirs(cache_dir)
 
+    d = requests.get(LETS_ENCRYPT_ACME_URL)
+    print(d.json())
+
 
 if __name__ == '__main__':
-    do(80, 443, 'foobar.org', 'www.foobar.org', accept_tos=True)
+    s80 = socket.socket(socket.AF_INET, socket.SOCK_STREAM)
+    s80.bind(('0.0.0.0', 8080))
+    s80.listen()
+
+    s443 = socket.socket(socket.AF_INET, socket.SOCK_STREAM)
+    s443.bind(('0.0.0.0', 8443))
+    s443.listen()
+
+    do(s80, s443, 'foobar.org', 'www.foobar.org', accept_tos=True)
