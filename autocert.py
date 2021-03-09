@@ -56,10 +56,12 @@ old ones will still have the "old" cert but that's fine (still valid)
 
 import base64
 import hashlib
+from http.server import BaseHTTPRequestHandler, HTTPServer
 import json
 import os
 import socket
 import ssl
+from threading import Thread
 
 import appdirs
 from cryptography.hazmat.primitives import hashes, serialization
@@ -68,6 +70,39 @@ import requests
 
 #LETS_ENCRYPT_ACME_URL = 'https://acme-v02.api.letsencrypt.org/directory'
 LETS_ENCRYPT_ACME_URL = 'https://acme-staging-v02.api.letsencrypt.org/directory'
+
+
+# TODO: can this be made better / simpler?
+class HTTPRedirectHandler(BaseHTTPRequestHandler):
+
+    def log_message(self, fmt, *args):
+        return
+
+    def redirect(self):
+        self.send_response(301)
+        self.send_header('Location', 'https://' + self.headers.get('Host') + self.path)
+        self.end_headers()
+
+    do_GET = redirect
+    do_HEAD = redirect
+    do_POST = redirect
+    do_PUT = redirect
+    do_DELETE = redirect
+    do_TRACE = redirect
+    do_OPTIONS = redirect
+    do_CONNECT = redirect
+    do_PATCH = redirect
+
+
+class HTTPRedirectServer(HTTPServer):
+
+    def __init__(self, s80):
+        super().__init__(s80.getsockname(), HTTPRedirectHandler, bind_and_activate=False)
+        self.socket = s80
+        self.bg_server = Thread(target=self.serve_forever, daemon=True)
+
+    def start(self):
+        self.bg_server.start()
 
 
 class AutocertError(Exception):
@@ -243,6 +278,8 @@ if __name__ == '__main__':
     s80.listen()
 
     # setup 80->443 redirect on s80
+    srv = HTTPRedirectServer(s80)
+    srv.start()
 
     s443 = socket.socket(socket.AF_INET, socket.SOCK_STREAM)
     s443.bind(('0.0.0.0', 8443))
