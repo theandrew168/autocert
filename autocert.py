@@ -55,6 +55,7 @@ old ones will still have the "old" cert but that's fine (still valid)
 """
 
 import base64
+from datetime import datetime, timedelta, timezone
 import hashlib
 from http.server import BaseHTTPRequestHandler, HTTPServer
 import json
@@ -64,12 +65,18 @@ import ssl
 from threading import Thread
 
 import appdirs
+from cryptography import x509
 from cryptography.hazmat.primitives import hashes, serialization
 from cryptography.hazmat.primitives.asymmetric import ec, utils
+from cryptography.x509 import oid
 import requests
 
 #LETS_ENCRYPT_ACME_URL = 'https://acme-v02.api.letsencrypt.org/directory'
 LETS_ENCRYPT_ACME_URL = 'https://acme-staging-v02.api.letsencrypt.org/directory'
+
+# OID for the ACME extension for the TLS-ALPN challenge.
+# https://tools.ietf.org/html/draft-ietf-acme-tls-alpn-05#section-5.1
+ID_PE_ACME_IDENTIFIER = x509.ObjectIdentifier('1.3.6.1.5.5.7.1.31')
 
 
 # TODO: can this be made better / simpler?
@@ -117,12 +124,21 @@ def int_to_bytes(i):
     return i.to_bytes((i.bit_length() + 7) // 8, byteorder='big')
 
 
+def bytes_to_der(b):
+    assert len(b) < 128
+
+    octet_string = 0x04
+    header = [octet_string, len(b)]
+    return bytes(header) + b
+
+
 class ACMEClient:
 
-    def __init__(self, accept_tos=False, directory_url=LETS_ENCRYPT_ACME_URL):
+    def __init__(self, sock, accept_tos=False, directory_url=LETS_ENCRYPT_ACME_URL):
         if not accept_tos:
             raise AutocertError("CA's Terms of Service must be accepted")
 
+        self.sock = sock
         self.accept_tos = accept_tos
         self.directory_url = directory_url
 
@@ -165,7 +181,7 @@ class ACMEClient:
             'y': base64_encode(self.y),
         }
 
-        # calculate key thumbprint (for authz)
+        # calculate JWK thumbprint (for authz)
         akey_json = json.dumps(self.account_key, separators=(',', ':'), sort_keys=True)
         self.thumbprint = base64_encode(hashlib.sha256(akey_json.encode()).digest())
 
@@ -245,6 +261,58 @@ class ACMEClient:
     def get_authorization(self, auth_url):
         return self._cmd(auth_url, None)
 
+    def do_tls_alpn_01_challenge(self, domain, challenge):
+        print(domain)
+
+        token = challenge['token']
+        keyauth = '.'.join([token, self.thumbprint])
+
+        shasum = hashlib.sha256(keyauth.encode()).digest()
+        value = bytes_to_der(shasum)
+
+        # https://cryptography.io/en/latest/x509/reference.html#x-509-certificate-builder
+        builder = x509.CertificateBuilder()
+        builder = builder.subject_name(x509.Name([
+            x509.NameAttribute(oid.NameOID.COMMON_NAME, domain),
+        ]))
+        builder = builder.issuer_name(x509.Name([
+            x509.NameAttribute(oid.NameOID.COMMON_NAME, domain),
+        ]))
+        builder = builder.not_valid_before(datetime.now(timezone.utc))
+        builder = builder.not_valid_after(datetime.now(timezone.utc) + timedelta(7, 0, 0))
+        builder = builder.serial_number(x509.random_serial_number())
+        builder = builder.public_key(self.public_key)
+        builder = builder.add_extension(
+            x509.BasicConstraints(ca=False, path_length=None),
+            critical=True,
+        )
+        builder = builder.add_extension(
+            # digital_signature and key_encipherment
+            x509.KeyUsage(True, False, True, False, False, False, False, False, False),
+            critical=True,
+        )
+        builder = builder.add_extension(
+            x509.ExtendedKeyUsage([
+                oid.ExtendedKeyUsageOID.SERVER_AUTH,
+            ]),
+            critical=True,
+        )
+        builder = builder.add_extension(
+            # https://github.com/pyca/cryptography/issues/2747
+            x509.UnrecognizedExtension(ID_PE_ACME_IDENTIFIER, value),
+            critical=True,
+        )
+        cert = builder.sign(private_key=self.private_key, algorithm=hashes.SHA256())
+        cert = cert.public_bytes(serialization.Encoding.PEM).decode()
+
+        # create an SSLContext and add our cert
+        ctx = ssl.create_default_context(purpose=ssl.Purpose.CLIENT_AUTH)
+        ctx.set_ciphers('ECDHE+AESGCM')
+        ctx.set_alpn_protocols(['acme-tls/1'])
+        ctx.options |= ssl.OP_NO_TLSv1 | ssl.OP_NO_TLSv1_1
+        ctx.load_verify_locations(cadata=cert)
+        print(ctx.cert_store_stats())
+
 
 def do(s443, *domains, accept_tos=False):
     # ensure args are valid
@@ -261,15 +329,12 @@ def do(s443, *domains, accept_tos=False):
     print(order.json())
     for auth_url in order.json()['authorizations']:
         authorization = client.get_authorization(auth_url)
-        print(authorization)
-        print(authorization.json())
-
         domain = authorization.json()['identifier']['value']
-        print(domain)
 
         challenges = authorization.json()['challenges']
         challenge = [c for c in challenges if c['type'] == 'tls-alpn-01'][0]
-        print(challenge)
+
+        client.do_tls_alpn_01_challenge(domain, challenge)
 
 
 if __name__ == '__main__':

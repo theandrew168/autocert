@@ -31,12 +31,14 @@ s443 = socket.socket(socket.AF_INET, socket.SOCK_STREAM)
 s443.bind(('0.0.0.0', 443))
 s443.listen()
 
-# tls_s443 can now be used for serving HTTPS web traffic
-tls_s443 = autocert.do(s80, s443, 'example.org', 'www.example.org', accept_tos=True)
+# TODO: setup HTTP->HTTPS redirect
+
+# s443_tls can now be used for serving HTTPS web traffic
+s443_tls = autocert.do(s443, 'example.org', 'www.example.org', accept_tos=True)
 
 # waitress example
 import waitress
-waitress.serve(my_wsgi_app, sockets=[tls_s443], url_scheme='https')
+waitress.serve(my_wsgi_app, sockets=[s443_tls], url_scheme='https')
 ```
 
 ### systemd
@@ -55,10 +57,12 @@ if os.environ['LISTEN_FDS'] != 2:
 s80 = socket.fromfd(3, socket.AF_INET, socket.SOCK_STREAM)
 s443 = socket.fromfd(4, socket.AF_INET, socket.SOCK_STREAM)
 
-# tls_s443 can now be used for serving HTTPS web traffic
-tls_s443 = autocert.do(s80, s443, 'example.org', 'www.example.org', accept_tos=True)
+# TODO: setup HTTP->HTTPS redirect
+
+# s443_tls can now be used for serving HTTPS web traffic
+s443_tls = autocert.do(s80, s443, 'example.org', 'www.example.org', accept_tos=True)
 
 # waitress example
 import waitress
-waitress.serve(my_wsgi_app, sockets=[tls_s443], url_scheme='https')
+waitress.serve(my_wsgi_app, sockets=[s443_tls], url_scheme='https')
 ```
