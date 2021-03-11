@@ -13,11 +13,7 @@ from autocert import jwk, utils
 ID_PE_ACME_IDENTIFIER = x509.ObjectIdentifier('1.3.6.1.5.5.7.1.31')
 
 
-def generate_tls_alpn_01_cert(authorization, jwkey):
-    # pull out domain and TLS-ALPN-01 challenge
-    domain = authorization['identifier']['value']
-    challenge = [c for c in authorization['challenges'] if c['type'] == 'tls-alpn-01'][0]
-
+def generate_tls_alpn_01_key_cert(challenge, domain, jwkey):
     # create the keyauth value
     token = challenge['token']
     thumbprint = jwk.thumbprint(jwkey)

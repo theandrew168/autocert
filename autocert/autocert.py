@@ -19,48 +19,6 @@ import requests
 class ACMEClient:
 
     def do_tls_alpn_01_challenge(self, domain, challenge):
-        print(domain)
-
-        token = challenge['token']
-        keyauth = '.'.join([token, self.thumbprint])
-
-        shasum = hashlib.sha256(keyauth.encode()).digest()
-        value = bytes_to_der(shasum)
-
-        # https://cryptography.io/en/latest/x509/reference.html#x-509-certificate-builder
-        builder = x509.CertificateBuilder()
-        builder = builder.subject_name(x509.Name([
-            x509.NameAttribute(oid.NameOID.COMMON_NAME, domain),
-        ]))
-        builder = builder.issuer_name(x509.Name([
-            x509.NameAttribute(oid.NameOID.COMMON_NAME, domain),
-        ]))
-        builder = builder.not_valid_before(datetime.now(timezone.utc))
-        builder = builder.not_valid_after(datetime.now(timezone.utc) + timedelta(7, 0, 0))
-        builder = builder.serial_number(x509.random_serial_number())
-        builder = builder.public_key(self.public_key)
-        builder = builder.add_extension(
-            x509.BasicConstraints(ca=False, path_length=None),
-            critical=True,
-        )
-        builder = builder.add_extension(
-            # digital_signature and key_encipherment
-            x509.KeyUsage(True, False, True, False, False, False, False, False, False),
-            critical=True,
-        )
-        builder = builder.add_extension(
-            x509.ExtendedKeyUsage([
-                oid.ExtendedKeyUsageOID.SERVER_AUTH,
-            ]),
-            critical=True,
-        )
-        builder = builder.add_extension(
-            # https://github.com/pyca/cryptography/issues/2747
-            x509.UnrecognizedExtension(ID_PE_ACME_IDENTIFIER, value),
-            critical=True,
-        )
-        cert = builder.sign(private_key=self.private_key, algorithm=hashes.SHA256())
-        cert = cert.public_bytes(serialization.Encoding.PEM).decode()
 
         # create an SSLContext and add our cert
         ctx = ssl.create_default_context(purpose=ssl.Purpose.CLIENT_AUTH)

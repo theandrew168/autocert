@@ -75,10 +75,11 @@ class ACMEClient:
         resp = self._cmd(url, payload)
         return resp.json()
 
-    def get_authorization(self, order):
-        url = order['authorizations'][0]
-        resp = self._cmd(url, None)
-        return resp.json()
+    def get_authorizations(self, order):
+        urls = order['authorizations']
+        for url in urls:
+            resp = self._cmd(url, None)
+            yield resp.json()
 
     def _create_or_read_account(self):
         url = self.directory['newAccount']

@@ -21,6 +21,7 @@ t.start()
 
 domains = [
     'example.org',
+    'www.example.org',
 ]
 
 client = acme.ACMEClient(accept_tos=True)
@@ -28,9 +29,17 @@ client = acme.ACMEClient(accept_tos=True)
 order = client.create_order(domains)
 pprint(order)
 
-auth = client.get_authorization(order)
-pprint(auth)
+auths = client.get_authorizations(order)
+for auth in auths:
+    pprint(auth)
+    # pull out the domain and TLS-ALPN-01 challenge
+    domain = auth['identifier']['value']
+    chal_tls_alpn_01 = [c for c in auth['challenges'] if c['type'] == 'tls-alpn-01'][0]
 
-k, c = challenge.generate_tls_alpn_01_cert(auth, client.jwk)
-print(k)
-print(c)
+    key, cert = challenge.generate_tls_alpn_01_key_cert(chal_tls_alpn_01, domain, client.jwk)
+    print(key)
+    print(cert)
+
+    # TODO: start the SSL server
+    # TODO: tell ACME server to check
+    # TODO: wait til not pending
