@@ -20,6 +20,11 @@ pip install autocert
 These examples utilize the [waitress](https://docs.pylonsproject.org/projects/waitress/en/stable/) WSGI server but you can follow your own preference.
 However, whichever server you choose must be able to accept pre-listening sockets (you'll see what I mean).
 
+Waitress can be installed via pip:
+```
+pip install waitress
+```
+
 ### basic
 Here is a basic example of autocert usage (requires root):
 ```python
