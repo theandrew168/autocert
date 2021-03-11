@@ -11,8 +11,7 @@ setup(
     long_description=readme,
     long_description_content_type='text/markdown',
     url='https://github.com/theandrew168/autocert',
-    packages=[],
-    py_modules=['autocert'],
+    packages=['autocert'],
     install_requires=[
         'appdirs',
         'cryptography',
