@@ -10,6 +10,7 @@ from cryptography.x509 import oid
 import requests
 
 from autocert import utils
+from autocert.cache import Cache
 from autocert.jwk import JWK
 from autocert.jws import JWS
 
@@ -27,10 +28,12 @@ class ACMEClientError(Exception):
 
 class ACMEClient:
 
-    def __init__(self, accept_tos=False, directory_url=LETS_ENCRYPT_ACME_URL):
+    def __init__(self, cache, contact=None, accept_tos=False, directory_url=LETS_ENCRYPT_ACME_URL):
         if not accept_tos:
             raise ACMEClientError("CA's Terms of Service must be accepted")
 
+        self.cache = cache
+        self.contact = contact
         self.accept_tos = accept_tos
         self.directory_url = directory_url
 
@@ -38,20 +41,8 @@ class ACMEClient:
         self.directory = requests.get(self.directory_url).json()
         self.nonce = requests.head(self.directory['newNonce']).headers['Replay-Nonce']
 
-        # ensure autocert cache dir exists
-        self.cache_dir = appdirs.user_cache_dir('python-autocert', 'python-autocert')
-        if not os.path.exists(self.cache_dir):
-            os.makedirs(self.cache_dir)
-
         # load existing ACME account or create a new one
         self._init_account()
-
-    def get_domain_key(self, domain):
-        key_path = os.path.join(self.cache_dir, domain + '.key')
-        return self._create_or_read_key(key_path)
-
-    def get_domain_cert(self, domain):
-        cert_path = os.path.join(self.cache_dir, domain + '.cert')
 
     def create_order(self, domains):
         url = self.directory['newOrder']
@@ -70,11 +61,9 @@ class ACMEClient:
         resp = self._cmd(url, {})
         return resp.json()
 
-    def _create_or_read_key(self, path):
-        if os.path.exists(path):
-            # load pkey from cache
-            with open(path, 'rb') as f:
-                pem = f.read()
+    def _create_or_read_key(self, name):
+        if self.cache.exists(name):
+            pem = self.cache.read(name)
             return serialization.load_pem_private_key(pem, password=None)
         else:
             # generate a new pkey
@@ -84,15 +73,12 @@ class ACMEClient:
                 format=serialization.PrivateFormat.PKCS8,
                 encryption_algorithm=serialization.NoEncryption(),
             )
-            # save pkey to cache
-            with open(path, 'wb') as f:
-                f.write(pem)
+            self.cache.write(name, pem)
             return pkey
 
     def _init_account(self):
         # check if account (aka private key) already exists
-        acct_path = os.path.join(self.cache_dir, 'acme_account')
-        self.private_key = self._create_or_read_key(acct_path)
+        self.private_key = self._create_or_read_key('acme_account.key')
 
         # derive public key and json web key
         self.public_key = self.private_key.public_key()
@@ -108,6 +94,25 @@ class ACMEClient:
         payload = {
             'termsOfServiceAgreed': self.accept_tos,
         }
+
+        # apply contact emails if present
+        contact = self.contact
+        if contact is not None:
+            # if email is just a string, make it a single-element list
+            if type(contact) == str:
+                contact = [contact]
+
+            # add mailto prefix to each email if not already present
+            emails = []
+            for email in contact:
+                if email.startswith('mailto:'):
+                    emails.append(email)
+                else:
+                    emails.append('mailto:' + email)
+
+            # add to payload
+            payload['contact'] = emails
+
         return self._cmd(url, payload)
 
     def _cmd(self, url, payload):
