@@ -46,6 +46,13 @@ class ACMEClient:
         # load existing ACME account or create a new one
         self._init_account()
 
+    def get_domain_key(self, domain):
+        key_path = os.path.join(self.cache_dir, domain + '.key')
+        return self._create_or_read_key(key_path)
+
+    def get_domain_cert(self, domain):
+        cert_path = os.path.join(self.cache_dir, domain + '.cert')
+
     def create_order(self, domains):
         url = self.directory['newOrder']
         payload = {
@@ -63,25 +70,29 @@ class ACMEClient:
         resp = self._cmd(url, {})
         return resp.json()
 
-    def _init_account(self):
-        # check if account (aka private key) already exists
-        acct_path = os.path.join(self.cache_dir, 'acme_account')
-        if os.path.exists(acct_path):
+    def _create_or_read_key(self, path):
+        if os.path.exists(path):
             # load pkey from cache
-            with open(acct_path, 'rb') as f:
+            with open(path, 'rb') as f:
                 pem = f.read()
-            self.private_key = serialization.load_pem_private_key(pem, password=None)
+            return serialization.load_pem_private_key(pem, password=None)
         else:
             # generate a new pkey
-            self.private_key = ec.generate_private_key(ec.SECP256R1())
-            pem = self.private_key.private_bytes(
+            pkey = ec.generate_private_key(ec.SECP256R1())
+            pem = pkey.private_bytes(
                 encoding=serialization.Encoding.PEM,
                 format=serialization.PrivateFormat.PKCS8,
                 encryption_algorithm=serialization.NoEncryption(),
             )
             # save pkey to cache
-            with open(acct_path, 'wb') as f:
+            with open(path, 'wb') as f:
                 f.write(pem)
+            return pkey
+
+    def _init_account(self):
+        # check if account (aka private key) already exists
+        acct_path = os.path.join(self.cache_dir, 'acme_account')
+        self.private_key = self._create_or_read_key(acct_path)
 
         # derive public key and json web key
         self.public_key = self.private_key.public_key()

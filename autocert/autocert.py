@@ -73,7 +73,7 @@ def do(s443, *domains, accept_tos=False):
             print('started sock_tls accept loop')
             while True:
                 try:
-                    conn, addr = sock_tls.accept()
+                    conn, addr = s443_tls.accept()
                     #conn_tls = ctx.wrap_socket(conn, server_side=True)
                     print('***********************')
                     print('got conn from: {}'.format(addr))
