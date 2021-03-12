@@ -1,11 +1,12 @@
 from cryptography.hazmat.primitives.asymmetric import ec
 
-from autocert import jwk, jws
+from autocert.jwk import JWK
+from autocert.jws import JWS
 
 
-def test_encode_jwk():
+def test_sign_with_jwk():
     pkey = ec.generate_private_key(curve=ec.SECP256R1())
-    jwkey = jwk.from_public_key(pkey.public_key())
+    jwk = JWK.from_public_key(pkey.public_key())
 
     url = 'http://example.org'
     payload = {
@@ -13,13 +14,16 @@ def test_encode_jwk():
         'cat': 'dog',
     }
     nonce = 'abc123nonce'
-    sig = jws.encode(url, payload, nonce, pkey, jwk=jwkey)
-    assert 'protected' in sig
-    assert 'payload' in sig
-    assert 'signature' in sig
+    jws = JWS(url, payload, nonce, jwk=jwk)
+    jws = jws.sign(pkey)
+
+    assert type(jws) == str
+    assert 'protected' in jws
+    assert 'payload' in jws
+    assert 'signature' in jws
 
 
-def test_encode_kid():
+def test_sign_with_kid():
     pkey = ec.generate_private_key(curve=ec.SECP256R1())
     kid = 'http://example.org/myaccount'
 
@@ -29,20 +33,26 @@ def test_encode_kid():
         'cat': 'dog',
     }
     nonce = 'abc123nonce'
-    sig = jws.encode(url, payload, nonce, pkey, kid=kid)
-    assert 'protected' in sig
-    assert 'payload' in sig
-    assert 'signature' in sig
+    jws = JWS(url, payload, nonce, kid=kid)
+    jws = jws.sign(pkey)
+
+    assert type(jws) == str
+    assert 'protected' in jws
+    assert 'payload' in jws
+    assert 'signature' in jws
 
 
-def test_encode_empty_payload():
+def test_sign_with_empty_payload():
     pkey = ec.generate_private_key(curve=ec.SECP256R1())
-    jwkey = jwk.from_public_key(pkey.public_key())
+    jwk = JWK.from_public_key(pkey.public_key())
 
     url = 'http://example.org'
     payload = None
     nonce = 'abc123nonce'
-    sig = jws.encode(url, payload, nonce, pkey, jwk=jwkey)
-    assert 'protected' in sig
-    assert 'payload' in sig
-    assert 'signature' in sig
+    jws = JWS(url, payload, nonce, jwk=jwk)
+    jws = jws.sign(pkey)
+
+    assert type(jws) == str
+    assert 'protected' in jws
+    assert 'payload' in jws
+    assert 'signature' in jws

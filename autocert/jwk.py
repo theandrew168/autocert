@@ -14,25 +14,28 @@ NIST_CURVE_NAMES = {
 }
 
 
-def from_public_key(public_key):
-    if public_key.curve.name not in NIST_CURVE_NAMES:
-        raise ValueError('unsupported curve: {}'.format(public_key.curve.name))
+class JWK(dict):
 
-    crv = NIST_CURVE_NAMES[public_key.curve.name]
-    x = utils.int_to_bytes(public_key.public_numbers().x)
-    y = utils.int_to_bytes(public_key.public_numbers().y)
+    @classmethod
+    def from_public_key(cls, public_key):
+        if public_key.curve.name not in NIST_CURVE_NAMES:
+            raise ValueError('unsupported curve: {}'.format(public_key.curve.name))
 
-    jwk = {
-        'kty': 'EC',
-        'crv': crv,
-        'x': utils.base64_rfc4648(x),
-        'y': utils.base64_rfc4648(y),
-    }
-    return jwk
+        crv = NIST_CURVE_NAMES[public_key.curve.name]
+        x = utils.int_to_bytes(public_key.public_numbers().x)
+        y = utils.int_to_bytes(public_key.public_numbers().y)
 
+        jwk = {
+            'kty': 'EC',
+            'crv': crv,
+            'x': utils.base64_rfc4648(x),
+            'y': utils.base64_rfc4648(y),
+        }
+        return cls(jwk)
 
-def thumbprint(jwk):
-    jwk = json.dumps(jwk, separators=(',', ':'), sort_keys=True)
-    jwk = jwk.encode()
-    sha256_hash = hashlib.sha256(jwk).digest()
-    return utils.base64_rfc4648(sha256_hash)
+    def thumbprint(self):
+        thumbprint = json.dumps(self, separators=(',', ':'), sort_keys=True)
+        thumbprint = thumbprint.encode()
+        thumbprint = hashlib.sha256(thumbprint).digest()
+        thumbprint = utils.base64_rfc4648(thumbprint)
+        return thumbprint
