@@ -22,62 +22,72 @@ class ACMEInterceptor:
         self.cache = cache
         self.domains = domains
         self.client = client
+        self.acme_tls_challenge = False
 
-    # Fluent Python: Chapter 21 - Class Metaprogramming
-    def make_sslsocket_class(self):
-        def do_handshake(self):
-            super().do_handshake()
-            alpn_protocol = self.selected_alpn_protocol()
-            print('handshake:', alpn_protocol)
+    def schedule_renewals(self):
+        for domain in self.domains:
+            thread = threading.Thread(
+                target=self.renewal_loop,
+                args=(domain,),
+                daemon=True
+            )
+            thread.start()
 
-            # swap to ACME challenge chain if requested
-            if alpn_protocol == 'acme-tls/1':
-                key_path = self.cache.path(self.domain + '.key')
-                cert_path = self.cache.path(self.domain + '.cert.acme')
-                self.context.load_cert_chain(cert_path, key_path)
+    def renewal_loop(self, domain):
+        print('started renewal loop for:', domain)
+        # TODO: check cert for domain
+        # TODO: if not exists
+        # TODO:     gen pkey
+        # TODO:     do an ACME flow (order, challenge, finalize, CSR, cert)
+        # TODO:     update cert
+        # TODO: else if lifetime < 30 days:
+        # TODO:     do an ACME flow (order, challenge, finalize, CSR, cert)
+        # TODO:     update cert
+        # TODO:
+        # TODO: sleep timer till 30 days before expire
 
-        def set_domain(self, domain):
-            self.domain = domain
-
-        cls_attrs = {
-            'interceptor': self,
-            'do_handshake': do_handshake,
-            'set_domain': set_domain,
-            'domain': None,
-        }
-
-        return type('ACMEInterceptorSocket', ssl.SSLSocket.__mro__, cls_attrs)
-
-    def sni_callback(self, acmesocket, sni_name, sslcontext):
+    def sni_callback(self, sslsocket, sni_name, sslcontext):
         print('got request for: {}'.format(sni_name))
 
         # nothing to do for empty sni_name
         if sni_name is None:
-            print('got an unknown sni_name, bailing out')
+            print('empty sni_name')
             return
 
         key_name = sni_name + '.key'
         cert_name = sni_name + '.cert'
+
         if not self.cache.exists(key_name) or not self.cache.exists(cert_name):
-            print('got an unknown sni_name, bailing out')
+            print('invalid sni_name or chain doesnt exist yet:', sni_name)
             return
 
+        # else, load up a different chain
         key_path = self.cache.path(key_name)
         cert_path = self.cache.path(cert_name)
 
         # load regular chain for sni_name and set socket domain
+        print('loading key', key_path)
+        print('loading cert', cert_path)
         sslcontext.load_cert_chain(cert_path, key_path)
-        acmesocket.set_domain(sni_name)
+
+        # reset acme_tls_challenge flag
+        self.acme_tls_challenge = False
+
+    def msg_callback(self, conn, direction, version, content_type, msg_type, data):
+        if direction == 'read' and b'acme-tls/1' in data:
+            self.acme_tls_challenge = True
+            print('acme-tls/1 request from:', conn.raddr)
+            print('content-type:', content_type)
 
 
-def do(s443, *domains, contact=None, accept_tos=False):
+def do(sock, *domains, contact=None, accept_tos=False):
     # ensure args are valid
     if not accept_tos:
         raise AutocertError("CA's Terms of Service must be accepted")
-    if not isinstance(s443, socket.socket):
-        raise AutocertError('Socket s443 must be a socket')
-#    if s443.getsockname()[1] != 443:
-#        raise AutocertError('Socket s443 must be listening on port 443')
+    if not isinstance(sock, socket.socket):
+        raise AutocertError('Socket sock must be a socket')
+#    if sock.getsockname()[1] != 443:
+#        raise AutocertError('Socket sock must be listening on port 443')
 
     # use a platform-friendly directory for caching keys / certs
     cache_dir = appdirs.user_cache_dir('python-autocert', 'python-autocert')
@@ -87,14 +97,10 @@ def do(s443, *domains, contact=None, accept_tos=False):
     client = acme.ACMEClient(cache, contact=contact, accept_tos=accept_tos)
     interceptor = ACMEInterceptor(cache, domains, client)
 
-    # create self-signed certs for each domain if none exist
-    for domain in domains:
-        print('checking key / cert for:', domain)
-        key_name = domain + '.key'
-        cert_name = domain + '.cert'
-        if cache.exists(key_name) and cache.exists(cert_name):
-            continue
-
+    # generate default self-signed cert
+    default_key_name = 'default.key'
+    default_cert_name = 'default.cert'
+    if not cache.exists(default_key_name) or not cache.exists(default_cert_name):
         # generate a private key for this cert
         key = ec.generate_private_key(curve=ec.SECP256R1())
 
@@ -109,41 +115,39 @@ def do(s443, *domains, contact=None, accept_tos=False):
         builder = x509.CertificateBuilder()
         builder = builder.serial_number(x509.random_serial_number())
         builder = builder.subject_name(x509.Name([
-            x509.NameAttribute(oid.NameOID.COMMON_NAME, 'ACME Challenge'),
+            x509.NameAttribute(oid.NameOID.COMMON_NAME, 'default'),
         ]))
         builder = builder.issuer_name(x509.Name([
-            x509.NameAttribute(oid.NameOID.COMMON_NAME, 'ACME Challenge'),
+            x509.NameAttribute(oid.NameOID.COMMON_NAME, 'default'),
         ]))
         builder = builder.not_valid_before(datetime.now(timezone.utc))
-        builder = builder.not_valid_after(datetime.now(timezone.utc) + timedelta(90, 0, 0))
-        builder = builder.add_extension(
-            x509.SubjectAlternativeName([
-                x509.DNSName(domain),
-            ]),
-            critical=True,
-        )
+        builder = builder.not_valid_after(datetime.now(timezone.utc))
         builder = builder.public_key(key.public_key())
 
         # sign the cert and convert to PEM
         cert = builder.sign(private_key=key, algorithm=hashes.SHA256())
         cert_pem = cert.public_bytes(serialization.Encoding.PEM)
 
-        cache.write(key_name, key_pem)
-        cache.write(cert_name, cert_pem)
+        cache.write(default_key_name, key_pem)
+        cache.write(default_cert_name, cert_pem)
 
     # create ssl context w/ modern cipher and ability to accept acme-tls/1
     ctx = ssl.create_default_context(purpose=ssl.Purpose.CLIENT_AUTH)
     ctx.set_ciphers('ECDHE+AESGCM')
-    ctx.set_alpn_protocols(['acme-tls/1', 'h2', 'spdy/2', 'http/1.1'])
+    ctx.set_alpn_protocols(['acme-tls/1', 'http/1.1'])
     ctx.options |= ssl.OP_NO_TLSv1 | ssl.OP_NO_TLSv1_1
+    ctx.load_cert_chain(cache.path(default_cert_name), cache.path(default_key_name))
 
     # hook interceptor into the context
-    ctx.sslsocket_class = interceptor.make_sslsocket_class()
     ctx.sni_callback = interceptor.sni_callback
+    ctx._msg_callback = interceptor.msg_callback
+
+    # schedule cert renewals
+    interceptor.schedule_renewals()
 
     # wrap and return the TLS-enabled socket
-    s443_tls = ctx.wrap_socket(s443, server_side=True)
-    return s443_tls
+    sock_tls = ctx.wrap_socket(sock, server_side=True)
+    return sock_tls
 
 
 
@@ -171,12 +175,12 @@ def do(s443, *domains, contact=None, accept_tos=False):
 #        ctx.load_cert_chain(certfile=cert_path, keyfile=key_path)
 #
 #        # start the SSL server
-#        s443_tls = ctx.wrap_socket(s443, server_side=True)
+#        sock_tls = ctx.wrap_socket(sock, server_side=True)
 #        def accept_loop():
 #            print('started sock_tls accept loop')
 #            while True:
 #                try:
-#                    conn, addr = s443_tls.accept()
+#                    conn, addr = sock_tls.accept()
 #                    #conn_tls = ctx.wrap_socket(conn, server_side=True)
 #                    print('***********************')
 #                    print('got conn from: {}'.format(addr))
@@ -204,4 +208,4 @@ def do(s443, *domains, contact=None, accept_tos=False):
 #        # TODO: schedule renew
 #
 #        # return the SSL-wrapped socket
-#        return s443_tls
+#        return sock_tls
