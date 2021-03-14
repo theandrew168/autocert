@@ -130,8 +130,12 @@ class ACMEInterceptor:
             log.info('empty sni_name')
             return
 
+        # determine which chain to serve up
         pkey_name = sni_name + '.pkey'
         cert_name = sni_name + '.cert'
+        if self.acme_tls_challenge:
+            pkey_name += '.acme'
+            cert_name += '.acme'
         pkey_path = self.cache.path(pkey_name)
         cert_path = self.cache.path(cert_name)
 
