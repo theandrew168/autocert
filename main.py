@@ -12,7 +12,7 @@ s443.bind(('0.0.0.0', 8443))
 s443.listen()
 
 # setup automatic cert issuance and renewal
-s443_tls = autocert.do(s443, 'localhost', accept_tos=True)
+s443_tls = autocert.do(s443, 'example.org', accept_tos=True)
 
 # example WSGI app (could be Flask, Django, etc)
 def my_wsgi_app(environ, start_response):
