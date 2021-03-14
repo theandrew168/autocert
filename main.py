@@ -2,6 +2,9 @@ from autocert import autocert
 import socket
 import waitress
 
+import logging
+logging.basicConfig(level=logging.INFO)
+
 # open a socket on port 443
 s443 = socket.socket(socket.AF_INET, socket.SOCK_STREAM)
 s443.setsockopt(socket.SOL_SOCKET, socket.SO_REUSEADDR, 1)

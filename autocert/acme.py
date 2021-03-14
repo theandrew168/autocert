@@ -1,5 +1,6 @@
 from datetime import datetime, timedelta, timezone
 import hashlib
+import logging
 import os
 
 import appdirs
@@ -20,6 +21,8 @@ LETS_ENCRYPT_ACME_URL = 'https://acme-staging-v02.api.letsencrypt.org/directory'
 # OID for the ACME extension for the TLS-ALPN challenge.
 # https://tools.ietf.org/html/draft-ietf-acme-tls-alpn-05#section-5.1
 ID_PE_ACME_IDENTIFIER = x509.ObjectIdentifier('1.3.6.1.5.5.7.1.31')
+
+log = logging.getLogger(__name__)
 
 
 class ACMEClientError(Exception):
@@ -45,6 +48,7 @@ class ACMEClient:
         self._init_account()
 
     def create_order(self, domains):
+        log.info('creating order for domains: %s', domains)
         url = self.directory['newOrder']
         payload = {
             'identifiers': [{'type': 'dns', 'value': domain} for domain in domains],
@@ -53,20 +57,24 @@ class ACMEClient:
         return resp.json()
 
     def get_authorization(self, auth_url):
+        log.info('getting authorization: %s', auth_url)
         resp = self._cmd(auth_url, None)
         return resp.json()
 
     def verify_challenge(self, challenge):
+        log.info('verifying challenge: %s', challenge['url'])
         url = challenge['url']
         resp = self._cmd(url, {})
         return resp.json()
 
     def _create_or_read_key(self, name):
         if self.cache.exists(name):
+            log.info('loading existing private key: %s', name)
             pem = self.cache.read(name)
             return serialization.load_pem_private_key(pem, password=None)
         else:
             # generate a new pkey
+            log.info('creating new private key: %s', name)
             pkey = ec.generate_private_key(ec.SECP256R1())
             pem = pkey.private_bytes(
                 encoding=serialization.Encoding.PEM,
@@ -88,6 +96,7 @@ class ACMEClient:
         # create / read acme account
         acct = self._create_or_read_account()
         self.kid = acct.headers['Location']
+        log.info('initialized account kid: %s', self.kid)
 
     def _create_or_read_account(self):
         url = self.directory['newAccount']
@@ -101,6 +110,8 @@ class ACMEClient:
             # if email is just a string, make it a single-element list
             if type(contact) == str:
                 contact = [contact]
+
+            log.info('attaching contact info to account: %s', contact)
 
             # add mailto prefix to each email if not already present
             emails = []
@@ -134,6 +145,7 @@ class ACMEClient:
         return resp
 
 
+# TODO: just pass domain and keyauth instead
 def generate_tls_alpn_01_key_cert(challenge, domain, jwk):
     # create the keyauth value
     token = challenge['token']
