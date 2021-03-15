@@ -153,7 +153,7 @@ class ACMEInterceptor:
     def msg_callback(self, conn, direction, version, content_type, msg_type, data):
         if direction == 'read' and b'acme-tls/1' in data:
             self.acme_tls_challenge = True
-            log.info('acme-tls/1 request from: %s', conn.raddr)
+            log.info('got an acme-tls/1 request')
             log.info('content-type: %s', content_type)
 
 
