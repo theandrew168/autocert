@@ -16,6 +16,10 @@ from autocert.cache import Cache
 log = logging.getLogger(__name__)
 
 
+class ACMEInterceptorError(Exception):
+    pass
+
+
 class ACMEInterceptor:
 
     def __init__(self, cache, domains, client):
@@ -114,8 +118,11 @@ class ACMEInterceptor:
             # challenge is over
             self.expecting_challenge = False
 
-            # at this point, we either failed or passed the challenge
             pprint(auth)
+
+            # at this point, we either failed or passed the challenge
+            if auth['status'] != 'valid':
+                raise ACMEInterceptorError('failed to satisfy ACME challenge: {}'.format(auth))
 
         print('TODO: generate CSRs')
         print('TODO: finalize the order')
