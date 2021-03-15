@@ -7,8 +7,10 @@ import time
 
 import appdirs
 from cryptography import x509
+from cryptography.hazmat.primitives import serialization
+from cryptography.hazmat.primitives.asymmetric import ec
 
-from autocert import acme, crypto
+from autocert import acme, certs
 from autocert.cache import Cache
 
 log = logging.getLogger(__name__)
@@ -20,71 +22,62 @@ class ACMEInterceptor:
         self.cache = cache
         self.domains = domains
         self.client = client
+
+        # flags to track when a TLS-ALPN-01 challenge is expected / in-progress
         self.expecting_challenge = False
         self.acme_tls_challenge = False
 
-    def schedule_renewals(self):
+        # create a self-signed cert for each domain (will get replaced)
         for domain in self.domains:
-            thread = threading.Thread(
-                target=self.renewal_loop,
-                args=(domain,),
-                daemon=True
-            )
-            thread.start()
+            self._init_cert(domain)
 
-    def renewal_loop(self, domain):
-        # check cert for domain
-        # if not exists
-        #     gen pkey
-        #     do an ACME flow (order, challenge, finalize, CSR, cert)
-        #     update cert
-        # else if lifetime < 30 days:
-        #     do an ACME flow (order, challenge, finalize, CSR, cert)
-        #     update cert
-        # 
-        # sleep timer till 30 days before expire
-        log.info('started renewal loop for: %s', domain)
-
-        pkey_name = domain + '.pkey'
-        cert_name = domain + '.cert'
-        pkey_path = self.cache.path(pkey_name)
-        cert_path = self.cache.path(cert_name)
-
-        # create an expired self-signed chain
-        if not self.cache.exists(pkey_name) or not self.cache.exists(cert_name):
-            log.info('generating self-signed cert for: %s', domain)
-            pkey_pem, cert_pem = crypto.generate_self_signed_chain(domain)
-
-            log.info('adding self-signed chain to cache: %s', domain)
-            self.cache.write(pkey_name, pkey_pem)
-            self.cache.write(cert_name, cert_pem)
-
+    def issue_and_renew_forever(self):
+        log.info('starting issue/renew loop for domains: %s', self.domains)
         while True:
-            pkey_pem = self.cache.read(pkey_name)
-            cert_pem = self.cache.read(cert_name)
+            earliest_expiry = min(self._check_expiry(d) for d in self.domains)
 
-            # load cert and check remaining validity
-            cert = x509.load_pem_x509_certificate(cert_pem)
-            expires = cert.not_valid_after
-            expires = expires.replace(tzinfo=timezone.utc)
-
-            # check how many seconds remain until the 30 day point
-            remaining = expires - datetime.now(timezone.utc) - timedelta(days=30)
+            # determine how many seconds remain until TTL is within 30 days
+            remaining = earliest_expiry - datetime.now(timezone.utc) - timedelta(days=30)
             remaining = remaining.total_seconds()
 
             # sleep til the 30 day mark
             if remaining > 0:
-                log.info('cert still valid, sleeping for: %s', remaining)
+                log.info('certs are still valid, sleeping for: %s', remaining)
                 time.sleep(remaining.total_seconds())
 
             # time to renew
-            log.info('time is up, renewing cert for: %s', domain)
-            self.do_renewal(domain)
+            log.info('time is up, renewing certs for: %s', self.domains)
+            self._do_renewal()
 
-    def do_renewal(self, domain):
-        log.info('renewing cert for: %s', domain)
+    def _init_cert(self, domain):
+        pkey_name = domain + '.pkey'
+        cert_name = domain + '.cert'
+
+        # create an expired self-signed chain
+        if not self.cache.exists(pkey_name) or not self.cache.exists(cert_name):
+            log.info('generating initial self-signed cert for: %s', domain)
+            pkey_pem, cert_pem = certs.generate_self_signed_chain(domain)
+            self.cache.write(pkey_name, pkey_pem)
+            self.cache.write(cert_name, cert_pem)
+        else:
+            log.info('cert already exists for: %s', domain)
+
+    def _check_expiry(self, domain):
+        # load cert from cache
+        cert_name = domain + '.cert'
+        cert_pem = self.cache.read(cert_name)
+
+        # import and check TTL
+        cert = x509.load_pem_x509_certificate(cert_pem)
+        expires = cert.not_valid_after
+        expires = expires.replace(tzinfo=timezone.utc)
+        return expires
+
+    def _do_renewal(self):
         from pprint import pprint
-        order = self.client.create_order(domain)
+        log.info('renewing certs for: %s', self.domains)
+
+        order = self.client.create_order(self.domains)
         pprint(order)
         auth_urls = order['authorizations']
         for auth_url in auth_urls:
@@ -95,32 +88,37 @@ class ACMEInterceptor:
             domain = auth['identifier']['value']
             challenge = [c for c in auth['challenges'] if c['type'] == 'tls-alpn-01'][0]
 
-            # TODO: HACKY: create the keyauth value
+            # determine the keyauth value
             token = challenge['token']
-            thumbprint = self.client.jwk.thumbprint()
-            keyauth = '{}.{}'.format(token, thumbprint)
-            keyauth = keyauth.encode()
+            keyauth = self.client.get_keyauth(token)
 
             # generate the TLS-ALPN-01 challenge chain
             pkey_name = domain + '.pkey.acme'
             cert_name = domain + '.cert.acme'
-            pkey_pem, cert_pem = crypto.generate_tls_alpn_01_chain(domain, keyauth)
+            pkey_pem, cert_pem = certs.generate_tls_alpn_01_chain(domain, keyauth)
             self.cache.write(pkey_name, pkey_pem)
             self.cache.write(cert_name, cert_pem)
 
             # get ready for challenge requests
             self.expecting_challenge = True
 
-            # tell LE to check
+            # tell ACME server to verify our challenge
             self.client.verify_challenge(challenge)
 
             # poll til status isn't pending anymore
             auth = self.client.get_authorization(auth_url)
             while auth['status'] == 'pending':
-                time.sleep(1)
+                time.sleep(5)
                 auth = self.client.get_authorization(auth_url)
 
+            # at this point, we either failed or passed the challenge
             pprint(auth)
+
+        print('TODO: generate CSRs')
+        print('TODO: finalize the order')
+        print('TODO: download the certs')
+        print('TODO: replace certs in the cache')
+        return
 
     def sni_callback(self, sslsocket, sni_name, sslcontext):
         log.info('got SNI request for: %s', sni_name)
@@ -170,40 +168,65 @@ def do(sock, *domains, contact=None, accept_tos=False):
 
     # use a platform-friendly directory for caching keys / certs
     cache_dir = appdirs.user_cache_dir('python-autocert', 'python-autocert')
-
-    # client writes to the cache and interceptor reads from it
     cache = Cache(cache_dir)
-    client = acme.ACMEClient(cache, contact=contact, accept_tos=accept_tos)
+
+    # load account pkey if it exists otherwise create one
+    account_pkey_name = 'account_acme.pkey'
+    account_pkey = create_or_read_private_key(cache, account_pkey_name)
+
+    # init ACME client and challenge interceptor
+    client = acme.ACMEClient(account_pkey, contact=contact, accept_tos=accept_tos)
     interceptor = ACMEInterceptor(cache, domains, client)
 
     # generate default self-signed cert
     default_pkey_name = 'default.pkey'
     default_cert_name = 'default.cert'
+    default_pkey_path = cache.path(default_pkey_name)
+    default_cert_path = cache.path(default_cert_name)
     if not cache.exists(default_pkey_name) or not cache.exists(default_cert_name):
         log.info('generating default chain')
-        pkey_pem, cert_pem = crypto.generate_self_signed_chain('default')
+        pkey_pem, cert_pem = certs.generate_self_signed_chain('default')
 
         log.info('adding default chain to cache')
         cache.write(default_pkey_name, pkey_pem)
         cache.write(default_cert_name, cert_pem)
 
-    pkey_path = cache.path(default_pkey_name)
-    cert_path = cache.path(default_cert_name)
-
-    # create ssl context w/ modern cipher and ability to accept acme-tls/1
+    # create ssl context w/ default chain and ability to accept acme-tls/1
     ctx = ssl.create_default_context(purpose=ssl.Purpose.CLIENT_AUTH)
     ctx.set_ciphers('ECDHE+AESGCM')
     ctx.set_alpn_protocols(['acme-tls/1', 'http/1.1'])
     ctx.options |= ssl.OP_NO_TLSv1 | ssl.OP_NO_TLSv1_1
-    ctx.load_cert_chain(cert_path, pkey_path)
+    ctx.load_cert_chain(default_cert_path, default_pkey_path)
 
     # hook interceptor into the context
     ctx.sni_callback = interceptor.sni_callback
     ctx._msg_callback = interceptor.msg_callback
 
-    # schedule cert renewals
-    interceptor.schedule_renewals()
+    # kick off cert issuance and renewal loop in a background thread
+    thread = threading.Thread(
+        target=interceptor.issue_and_renew_forever,
+        daemon=True,
+    )
+    thread.start()
 
     # wrap and return the TLS-enabled socket
     sock_tls = ctx.wrap_socket(sock, server_side=True)
     return sock_tls
+
+
+def create_or_read_private_key(cache, name):
+    if cache.exists(name):
+        log.info('loading existing private key: %s', name)
+        pem = cache.read(name)
+        pkey = serialization.load_pem_private_key(pem, password=None)
+        return pkey
+    else:
+        log.info('generating new private key: %s', name)
+        pkey = ec.generate_private_key(ec.SECP256R1())
+        pem = pkey.private_bytes(
+            encoding=serialization.Encoding.PEM,
+            format=serialization.PrivateFormat.PKCS8,
+            encryption_algorithm=serialization.NoEncryption(),
+        )
+        cache.write(name, pem)
+        return pkey

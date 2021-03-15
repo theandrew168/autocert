@@ -9,8 +9,6 @@ from cryptography.hazmat.primitives import hashes, serialization
 from cryptography.hazmat.primitives.asymmetric import ec
 import requests
 
-from autocert import crypto, utils
-from autocert.cache import Cache
 from autocert.jwk import JWK
 from autocert.jws import JWS
 
@@ -26,11 +24,16 @@ class ACMEClientError(Exception):
 
 class ACMEClient:
 
-    def __init__(self, cache, contact=None, accept_tos=False, directory_url=LETS_ENCRYPT_ACME_URL):
+    def __init__(self, private_key, contact=None, accept_tos=False, directory_url=LETS_ENCRYPT_ACME_URL):
         if not accept_tos:
             raise ACMEClientError("CA's Terms of Service must be accepted")
 
-        self.cache = cache
+        # initial ACME credentials
+        self.private_key = private_key
+        self.jwk = JWK.from_public_key(private_key.public_key())
+        self.kid = None
+
+        # other ACME details
         self.contact = contact
         self.accept_tos = accept_tos
         self.directory_url = directory_url
@@ -40,14 +43,16 @@ class ACMEClient:
         self.nonce = requests.head(self.directory['newNonce']).headers['Replay-Nonce']
 
         # load existing ACME account or create a new one
-        self._init_account()
+        acct = self._create_or_read_account()
+        self.kid = acct.headers['Location']
+        log.info('initialized account kid: %s', self.kid)
 
-    def create_order(self, domain):
-        log.info('creating order for domain: %s', domain)
+    def create_order(self, domains):
+        log.info('creating order for domains: %s', domains)
         url = self.directory['newOrder']
         payload = {
             'identifiers': [
-                {'type': 'dns', 'value': domain},
+                {'type': 'dns', 'value': domain} for domain in domains
             ],
         }
         resp = self._cmd(url, payload)
@@ -64,37 +69,11 @@ class ACMEClient:
         resp = self._cmd(url, {})
         return resp.json()
 
-    def _init_account(self):
-        # check if account (aka private key) already exists
-        self.private_key = self._create_or_read_private_key('acme_account.pkey')
-
-        # derive public key and json web key
-        self.public_key = self.private_key.public_key()
-        self.jwk = JWK.from_public_key(self.public_key)
-        self.kid = None
-
-        # create / read acme account
-        acct = self._create_or_read_account()
-        self.kid = acct.headers['Location']
-        log.info('initialized account kid: %s', self.kid)
-
-    def _create_or_read_private_key(self, name):
-        if self.cache.exists(name):
-            log.info('loading existing private key: %s', name)
-            pem = self.cache.read(name)
-            pkey = serialization.load_pem_private_key(pem, password=None)
-            return pkey
-        else:
-            # generate a new pkey
-            log.info('creating new private key: %s', name)
-            pkey = ec.generate_private_key(ec.SECP256R1())
-            pem = pkey.private_bytes(
-                encoding=serialization.Encoding.PEM,
-                format=serialization.PrivateFormat.PKCS8,
-                encryption_algorithm=serialization.NoEncryption(),
-            )
-            self.cache.write(name, pem)
-            return pkey
+    def get_keyauth(self, token):
+        thumbprint = self.jwk.thumbprint()
+        keyauth = '{}.{}'.format(token, thumbprint)
+        keyauth = keyauth.encode()
+        return keyauth
 
     def _create_or_read_account(self):
         url = self.directory['newAccount']
@@ -141,3 +120,21 @@ class ACMEClient:
         self.nonce = resp.headers['Replay-Nonce']
 
         return resp
+
+#    def _create_or_read_private_key(self, name):
+#        if self.cache.exists(name):
+#            log.info('loading existing private key: %s', name)
+#            pem = self.cache.read(name)
+#            pkey = serialization.load_pem_private_key(pem, password=None)
+#            return pkey
+#        else:
+#            # generate a new pkey
+#            log.info('creating new private key: %s', name)
+#            pkey = ec.generate_private_key(ec.SECP256R1())
+#            pem = pkey.private_bytes(
+#                encoding=serialization.Encoding.PEM,
+#                format=serialization.PrivateFormat.PKCS8,
+#                encryption_algorithm=serialization.NoEncryption(),
+#            )
+#            self.cache.write(name, pem)
+#            return pkey
