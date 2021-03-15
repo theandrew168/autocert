@@ -108,8 +108,11 @@ class ACMEInterceptor:
             # poll til status isn't pending anymore
             auth = self.client.get_authorization(auth_url)
             while auth['status'] == 'pending':
-                time.sleep(5)
+                time.sleep(1)
                 auth = self.client.get_authorization(auth_url)
+
+            # challenge is over
+            self.expecting_challenge = False
 
             # at this point, we either failed or passed the challenge
             pprint(auth)
@@ -134,6 +137,7 @@ class ACMEInterceptor:
         if self.acme_tls_challenge:
             pkey_name += '.acme'
             cert_name += '.acme'
+
         pkey_path = self.cache.path(pkey_name)
         cert_path = self.cache.path(cert_name)
 
@@ -142,6 +146,7 @@ class ACMEInterceptor:
             log.info('invalid sni_name or chain doesnt exist yet: %s', sni_name)
             return
 
+        # TODO: optimize this to avoid a load_cert_chain on every request
         # else, load up a different chain
         log.info('loading pkey: %s', pkey_path)
         log.info('loading cert: %s', cert_path)
@@ -151,10 +156,14 @@ class ACMEInterceptor:
         self.acme_tls_challenge = False
 
     def msg_callback(self, conn, direction, version, content_type, msg_type, data):
+        # early exit if not expecting a challenge
+        if not self.expecting_challenge:
+            return
+
+        # else look for 'acme-tls/1' in the raw stream
         if direction == 'read' and b'acme-tls/1' in data:
             self.acme_tls_challenge = True
-            log.info('got an acme-tls/1 request')
-            log.info('content-type: %s', content_type)
+            log.info('saw an acme-tls/1 request')
 
 
 def do(sock, *domains, contact=None, accept_tos=False):
