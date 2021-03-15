@@ -121,6 +121,7 @@ class ACMEInterceptor:
         print('TODO: finalize the order')
         print('TODO: download the certs')
         print('TODO: replace certs in the cache')
+        time.sleep(10)
         return
 
     def sni_callback(self, sslsocket, sni_name, sslcontext):
