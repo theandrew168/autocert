@@ -109,12 +109,10 @@ class Manager:
 
         # download the cert
         cert_url = order['certificate']
-        cert = self.client.download_certificate(cert_url)
-        print(cert)
+        cert_pem = self.client.download_certificate(cert_url)
 
-        print('TODO: replace certs in the cache')
-        time.sleep(10)
-        return
+        # replace certs in the cache
+        self.cache.write(self.tls_cert_name, cert_pem)
 
     def sni_callback(self, sslsocket, sni_name, sslcontext):
         # early exit if not in a challenge
