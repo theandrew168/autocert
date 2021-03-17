@@ -70,9 +70,11 @@ class PrivateKey:
         builder = builder.serial_number(x509.random_serial_number())
         builder = builder.subject_name(x509.Name([
             x509.NameAttribute(NameOID.COMMON_NAME, domains[0]),
+            x509.NameAttribute(NameOID.SUBJECT_NAME, domains[0]),
         ]))
         builder = builder.issuer_name(x509.Name([
             x509.NameAttribute(NameOID.COMMON_NAME, domains[0]),
+            x509.NameAttribute(NameOID.SUBJECT_NAME, domains[0]),
         ]))
         builder = builder.not_valid_before(datetime.now(timezone.utc))
         builder = builder.not_valid_after(datetime.now(timezone.utc) + ttl)
@@ -103,9 +105,11 @@ class PrivateKey:
         builder = builder.serial_number(x509.random_serial_number())
         builder = builder.subject_name(x509.Name([
             x509.NameAttribute(NameOID.COMMON_NAME, domain),
+            x509.NameAttribute(NameOID.SUBJECT_NAME, domain),
         ]))
         builder = builder.issuer_name(x509.Name([
             x509.NameAttribute(NameOID.COMMON_NAME, domain),
+            x509.NameAttribute(NameOID.SUBJECT_NAME, domain),
         ]))
         builder = builder.not_valid_before(datetime.now(timezone.utc))
         builder = builder.not_valid_after(datetime.now(timezone.utc) + ttl)
