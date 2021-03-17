@@ -106,6 +106,7 @@ class Manager:
 
         # finalize the order
         order = self.client.finalize_order(order, csr)
+        pprint(order)
 
         # download the cert
         cert_url = order['certificate']
