@@ -75,6 +75,9 @@ class ACMEClient:
         keyauth = keyauth.encode()
         return keyauth
 
+    def finalize_order(self, order, csr):
+        pass
+
     def _create_or_read_account(self):
         url = self.directory['newAccount']
         payload = {

@@ -43,7 +43,26 @@ class PrivateKey:
         return signature
 
     def generate_csr(self, domains):
-        pass
+        # https://cryptography.io/en/latest/x509/reference.html#x-509-csr-certificate-signing-request-builder-object
+        builder = x509.CertificateSigningRequestBuilder()
+        builder = builder.subject_name(x509.Name([
+            x509.NameAttribute(NameOID.COMMON_NAME, domains[0]),
+        ]))
+        builder = builder.add_extension(
+            x509.BasicConstraints(ca=False, path_length=None),
+            critical=True,
+        )
+        builder = builder.add_extension(
+            x509.SubjectAlternativeName(
+                [x509.DNSName(domain) for domain in domains]
+            ),
+            critical=True,
+        )
+
+        # sign the cert and convert to DER
+        csr = builder.sign(private_key=self.key, algorithm=hashes.SHA256())
+        csr = csr.public_bytes(serialization.Encoding.DER)
+        return csr
 
     def generate_self_signed_cert(self, domains, ttl=timedelta(days=30)):
         # https://cryptography.io/en/latest/x509/reference.html#x-509-certificate-builder

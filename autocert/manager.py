@@ -4,6 +4,8 @@ import time
 
 from cryptography import x509
 
+from autocert.errors import AutocertError
+
 log = logging.getLogger(__name__)
 
 
@@ -19,12 +21,10 @@ class Manager:
         self.primary_domain = domains[0]
         self.tls_pkey_name = self.primary_domain + '.pkey'
         self.tls_cert_name = self.primary_domain + '.cert'
-        self.tls_cert_acme_name = self.primary_domain + '.cert.acme'
 
         # setup key / cert file paths
         self.tls_pkey_path = self.cache.path(self.tls_pkey_name)
         self.tls_cert_path = self.cache.path(self.tls_cert_name)
-        self.tls_cert_acme_path = self.cache.path(self.tls_cert_acme_name)
 
         # flags to track when a TLS-ALPN-01 challenge is expected / in-progress
         self.expecting_challenge = False
@@ -47,16 +47,15 @@ class Manager:
 
             # sleep til the 30 day mark
             if remaining > 0:
-                log.info('certs are still valid, sleeping for: %s', remaining)
+                log.info('cert is still valid, sleeping for: %s', remaining)
                 time.sleep(remaining.total_seconds())
 
             # time to issue / renew
-            log.info('time is up, renewing certs for: %s', self.domains)
+            log.info('time is up, renewing cert for: %s', self.domains)
             self.issue_and_renew()
 
     def issue_and_renew(self):
         from pprint import pprint
-        log.info('renewing certs for: %s', self.domains)
 
         order = self.client.create_order(self.domains)
         pprint(order)
@@ -74,11 +73,9 @@ class Manager:
             keyauth = self.client.get_keyauth(token)
 
             # generate the TLS-ALPN-01 challenge chain
-            pkey_name = domain + '.pkey.acme'
-            cert_name = domain + '.cert.acme'
-            pkey_pem, cert_pem = certs.generate_tls_alpn_01_chain(domain, keyauth)
-            self.cache.write(pkey_name, pkey_pem)
-            self.cache.write(cert_name, cert_pem)
+            acme_cert_name = domain + '.acme.cert'
+            acme_cert = self.private_key.generate_tls_alpn_01_cert(domain, keyauth)
+            self.cache.write(acme_cert_name, acme_cert_pem)
 
             # get ready for challenge requests
             self.expecting_challenge = True
@@ -87,6 +84,7 @@ class Manager:
             self.client.verify_challenge(challenge)
 
             # poll til status isn't pending anymore
+            # TODO: smarter backoff here
             auth = self.client.get_authorization(auth_url)
             while auth['status'] == 'pending':
                 time.sleep(1)
@@ -99,11 +97,19 @@ class Manager:
 
             # at this point, we either failed or passed the challenge
             if auth['status'] != 'valid':
-                raise ACMEInterceptorError('failed to satisfy ACME challenge: {}'.format(auth))
+                raise AutocertError('failed to satisfy ACME challenge: {}'.format(auth))
 
-        print('TODO: generate CSRs')
-        print('TODO: finalize the order')
-        print('TODO: download the certs')
+        # generate CSR for new cert
+        csr = self.private_key.generate_csr(self.domains)
+
+        # finalize the order
+        order = self.client.finalize_order(order, csr)
+
+        # download the cert
+        cert_url = order['certificate']
+        cert = self.client.download_certificate(cert_url)
+        print(cert)
+
         print('TODO: replace certs in the cache')
         time.sleep(10)
         return
