@@ -74,7 +74,7 @@ class Manager:
 
             # generate the TLS-ALPN-01 challenge chain
             acme_cert_name = domain + '.acme.cert'
-            acme_cert = self.private_key.generate_tls_alpn_01_cert(domain, keyauth)
+            acme_cert_pem = self.private_key.generate_tls_alpn_01_cert(domain, keyauth)
             self.cache.write(acme_cert_name, acme_cert_pem)
 
             # get ready for challenge requests

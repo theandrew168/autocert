@@ -55,7 +55,7 @@ def manage(sock, *domains, contact=None, accept_tos=False):
         tls_pkey = PrivateKey(tls_pkey_pem)
     else:
         tls_pkey = PrivateKey()
-        tls_pkey_pem = tls_pkey_pem
+        tls_pkey_pem = tls_pkey.pem
         cache.write(tls_pkey_name, tls_pkey_pem)
 
     # ensure TLS cert exists (defaults to a self-signed cert)

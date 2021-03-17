@@ -76,7 +76,16 @@ class ACMEClient:
         return keyauth
 
     def finalize_order(self, order, csr):
-        pass
+        url = order['finalize']
+        payload = {
+            'csr': utils.base64_rfc4648(csr),
+        }
+        resp = self._cmd(url, payload)
+        return resp.json()
+
+    def download_certificate(self, cert_url):
+        resp = self._cmd(cert_url, None)
+        return resp.data
 
     def _create_or_read_account(self):
         url = self.directory['newAccount']
