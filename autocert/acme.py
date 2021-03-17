@@ -120,6 +120,7 @@ class ACMEClient:
         resp = requests.post(url, headers=headers, data=jws)
         if resp.status_code not in [200, 201, 204]:
             # TODO: if bad nonce, get another and retry
+            log.error('jws: %s', jws)
             log.error('url: %s', url)
             log.error('pay: %s', payload)
             log.error('nonce: %s', self.nonce)
