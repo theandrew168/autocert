@@ -1,12 +1,11 @@
-from cryptography.hazmat.primitives.asymmetric import ec
-
 from autocert.jwk import JWK
 from autocert.jws import JWS
+from autocert.keys import PrivateKey
 
 
 def test_sign_with_jwk():
-    pkey = ec.generate_private_key(curve=ec.SECP256R1())
-    jwk = JWK.from_public_key(pkey.public_key())
+    pkey = PrivateKey()
+    jwk = JWK.from_public_key(pkey.public_key)
 
     url = 'http://example.org'
     payload = {
@@ -24,7 +23,7 @@ def test_sign_with_jwk():
 
 
 def test_sign_with_kid():
-    pkey = ec.generate_private_key(curve=ec.SECP256R1())
+    pkey = PrivateKey()
     kid = 'http://example.org/myaccount'
 
     url = 'http://example.org'
@@ -43,8 +42,8 @@ def test_sign_with_kid():
 
 
 def test_sign_with_empty_payload():
-    pkey = ec.generate_private_key(curve=ec.SECP256R1())
-    jwk = JWK.from_public_key(pkey.public_key())
+    pkey = PrivateKey()
+    jwk = JWK.from_public_key(pkey.public_key)
 
     url = 'http://example.org'
     payload = None

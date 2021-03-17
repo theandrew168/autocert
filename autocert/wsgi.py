@@ -1,6 +1,13 @@
 from urllib.parse import quote
 
 
+def hello_world_app(environ, start_response):
+    status = '200 OK'
+    response_headers = [('Content-Type', 'text/plain')]
+    start_response(status, response_headers)
+    return [b'Hello world from autocert!\n']
+
+
 def redirect_app(environ, start_response):
     status = '301 Moved Permanently'
     response_headers = [('Location', reconstruct_https_url(environ))]

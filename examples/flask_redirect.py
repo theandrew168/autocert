@@ -1,7 +1,15 @@
 from autocert import autocert, wsgi
+from flask import Flask
 import socket
 import threading
 import waitress
+
+# create a minimal Flask application
+app = Flask(__name__)
+
+@app.route('/')
+def hello_world():
+    return 'Hello world from flask!'
 
 # open a socket on port 80
 s80 = socket.socket(socket.AF_INET, socket.SOCK_STREAM)
@@ -28,4 +36,4 @@ t.start()
 s443_tls = autocert.manage(s443, 'example.org', 'www.example.org', accept_tos=True)
 
 # serve your app with TLS!
-waitress.serve(wsgi.hello_world_app, sockets=[s443_tls], url_scheme='https')
+waitress.serve(app, sockets=[s443_tls], url_scheme='https')

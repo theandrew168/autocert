@@ -30,7 +30,7 @@ class ACMEClient:
 
         # initial ACME credentials
         self.private_key = private_key
-        self.jwk = JWK.from_public_key(private_key.public_key())
+        self.jwk = JWK.from_public_key(private_key.public_key)
         self.kid = None
 
         # other ACME details
@@ -84,10 +84,6 @@ class ACMEClient:
         # apply contact emails if present
         contact = self.contact
         if contact is not None:
-            # if email is just a string, make it a single-element list
-            if type(contact) == str:
-                contact = [contact]
-
             log.info('attaching contact info to account: %s', contact)
 
             # add mailto prefix to each email if not already present
@@ -120,21 +116,3 @@ class ACMEClient:
         self.nonce = resp.headers['Replay-Nonce']
 
         return resp
-
-#    def _create_or_read_private_key(self, name):
-#        if self.cache.exists(name):
-#            log.info('loading existing private key: %s', name)
-#            pem = self.cache.read(name)
-#            pkey = serialization.load_pem_private_key(pem, password=None)
-#            return pkey
-#        else:
-#            # generate a new pkey
-#            log.info('creating new private key: %s', name)
-#            pkey = ec.generate_private_key(ec.SECP256R1())
-#            pem = pkey.private_bytes(
-#                encoding=serialization.Encoding.PEM,
-#                format=serialization.PrivateFormat.PKCS8,
-#                encryption_algorithm=serialization.NoEncryption(),
-#            )
-#            self.cache.write(name, pem)
-#            return pkey

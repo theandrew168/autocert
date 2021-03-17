@@ -1,0 +1,4 @@
+
+
+class AutocertError(Exception):
+    pass

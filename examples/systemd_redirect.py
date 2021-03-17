@@ -26,14 +26,7 @@ t = threading.Thread(
 t.start()
 
 # setup automatic cert issuance and renewal
-s443_tls = autocert.do(s443, 'example.org', 'www.example.org', accept_tos=True)
-
-# example WSGI app (could be Flask, Django, etc)
-def my_wsgi_app(environ, start_response):
-    status = '200 OK'
-    response_headers = [('Content-Type', 'text/plain')]
-    start_response(status, response_headers)
-    return [b'Hello world from simple WSGI app\n']
+s443_tls = autocert.manage(s443, 'example.org', 'www.example.org', accept_tos=True)
 
 # serve your app with TLS!
-waitress.serve(my_wsgi_app, sockets=[s443_tls], url_scheme='https')
+waitress.serve(wsgi.hello_world_app, sockets=[s443_tls], url_scheme='https')
