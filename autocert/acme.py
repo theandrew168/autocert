@@ -9,6 +9,8 @@ from cryptography.hazmat.primitives import hashes, serialization
 from cryptography.hazmat.primitives.asymmetric import ec
 import requests
 
+from autocert import utils
+from autocert.errors import AutocertError
 from autocert.jwk import JWK
 from autocert.jws import JWS
 
@@ -18,15 +20,11 @@ LETS_ENCRYPT_ACME_URL = 'https://acme-staging-v02.api.letsencrypt.org/directory'
 log = logging.getLogger(__name__)
 
 
-class ACMEClientError(Exception):
-    pass
-
-
 class ACMEClient:
 
     def __init__(self, private_key, contact=None, accept_tos=False, directory_url=LETS_ENCRYPT_ACME_URL):
         if not accept_tos:
-            raise ACMEClientError("CA's Terms of Service must be accepted")
+            raise AutocertError("CA's Terms of Service must be accepted")
 
         # initial ACME credentials
         self.private_key = private_key
@@ -122,7 +120,7 @@ class ACMEClient:
         resp = requests.post(url, headers=headers, data=jws)
         if resp.status_code not in [200, 201, 204]:
             # TODO: if bad nonce, get another and retry
-            raise ACMEClientError('ACME error: {}'.format(resp.json()))
+            raise AutocertError('ACME error: {}'.format(resp.json()))
 
         # update nonce
         self.nonce = resp.headers['Replay-Nonce']
