@@ -83,7 +83,7 @@ class ACMEClient:
 
     def download_certificate(self, cert_url):
         resp = self._cmd(cert_url, None)
-        return resp.data
+        return resp.content
 
     def _create_or_read_account(self):
         url = self.directory['newAccount']
@@ -120,6 +120,9 @@ class ACMEClient:
         resp = requests.post(url, headers=headers, data=jws)
         if resp.status_code not in [200, 201, 204]:
             # TODO: if bad nonce, get another and retry
+            log.error('url: %s', url)
+            log.error('pay: %s', payload)
+            log.error('nonce: %s', self.nonce)
             raise AutocertError('ACME error: {}'.format(resp.json()))
 
         # update nonce

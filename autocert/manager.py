@@ -57,8 +57,10 @@ class Manager:
     def issue_and_renew(self):
         from pprint import pprint
 
+        # TODO: check if order['status'] isn't pending for some reason
         order = self.client.create_order(self.domains)
         pprint(order)
+
         auth_urls = order['authorizations']
         for auth_url in auth_urls:
             auth = self.client.get_authorization(auth_url)
