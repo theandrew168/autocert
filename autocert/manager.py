@@ -48,7 +48,7 @@ class Manager:
             # sleep til the 30 day mark
             if remaining > 0:
                 log.info('cert is still valid, sleeping for: %s', remaining)
-                time.sleep(remaining.total_seconds())
+                time.sleep(remaining)
 
             # time to issue / renew
             log.info('time is up, renewing cert for: %s', self.domains)
