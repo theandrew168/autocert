@@ -63,10 +63,9 @@ def manage(sock, *domains, contact=None, accept_tos=False):
         tls_cert_pem = tls_pkey.generate_self_signed_cert(domains)
         cache.write(tls_cert_name, tls_cert_pem)
 
-    # create ssl context w/ modern ciphers/options and ability to accept acme-tls/1
+    # create ssl context w/ modern ciphers/options
     ctx = ssl.create_default_context(purpose=ssl.Purpose.CLIENT_AUTH)
     ctx.set_ciphers('ECDHE+AESGCM')
-    ctx.set_alpn_protocols(['acme-tls/1', 'http/1.1'])
     ctx.options |= ssl.OP_NO_TLSv1 | ssl.OP_NO_TLSv1_1
 
     # SSLContext.load_cert_chain wants real files :(
