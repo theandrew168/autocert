@@ -5,7 +5,7 @@ from autocert.keys import PrivateKey
 
 def test_sign_with_jwk():
     pkey = PrivateKey()
-    jwk = JWK.from_public_key(pkey.public_key)
+    jwk = JWK(pkey.public_key)
 
     url = 'http://example.org'
     payload = {
@@ -43,7 +43,7 @@ def test_sign_with_kid():
 
 def test_sign_with_empty_payload():
     pkey = PrivateKey()
-    jwk = JWK.from_public_key(pkey.public_key)
+    jwk = JWK(pkey.public_key)
 
     url = 'http://example.org'
     payload = None

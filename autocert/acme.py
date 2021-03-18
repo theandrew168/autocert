@@ -28,7 +28,7 @@ class ACMEClient:
 
         # initial ACME credentials
         self.private_key = private_key
-        self.jwk = JWK.from_public_key(private_key.public_key)
+        self.jwk = JWK(private_key.public_key)
         self.kid = None
 
         # other ACME details

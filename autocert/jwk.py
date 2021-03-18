@@ -6,15 +6,14 @@ from autocert import utils
 
 class JWK(dict):
 
-    @classmethod
-    def from_public_key(cls, public_key):
+    def __init__(self, public_key):
         jwk = {
             'kty': 'EC',
             'crv': public_key.curve,
             'x': utils.base64_rfc4648(public_key.x),
             'y': utils.base64_rfc4648(public_key.y),
         }
-        return cls(jwk)
+        super().__init__(jwk)
 
     def thumbprint(self):
         thumbprint = json.dumps(self, separators=(',', ':'), sort_keys=True)
