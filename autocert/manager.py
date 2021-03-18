@@ -1,5 +1,6 @@
 from datetime import datetime, timedelta, timezone
 import logging
+import ssl
 import time
 
 from cryptography import x509
