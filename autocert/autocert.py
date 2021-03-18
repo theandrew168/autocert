@@ -79,8 +79,8 @@ def manage(sock, *domains, contact=None, accept_tos=False):
     manager = Manager(tls_pkey, cache, domains, client)
 
     # hook manager into the context
-    ctx.sni_callback = manager.sni_callback
     ctx._msg_callback = manager.msg_callback
+    ctx.sni_callback = manager.sni_callback
 
     # kick off cert issuance and renewal loop in a background thread
     thread = threading.Thread(

@@ -33,10 +33,10 @@ class Manager:
     def issue_and_renew_forever(self):
         log.info('starting issue/renew loop for domains: %s', self.domains)
         while True:
-            # load cert from cache
+            # read cert from cache
             cert_pem = self.cache.read(self.tls_cert_name)
 
-            # import and check TTL
+            # load as x509 and check TTL
             cert = x509.load_pem_x509_certificate(cert_pem)
             expiry = cert.not_valid_after
             expiry = expiry.replace(tzinfo=timezone.utc)
@@ -83,7 +83,8 @@ class Manager:
             self.expecting_challenge = True
 
             # tell ACME server to verify our challenge
-            self.client.verify_challenge(challenge)
+            challenge_url = challenge['url']
+            self.client.verify_challenge(challenge_url)
 
             # poll til status isn't pending anymore
             # TODO: smarter backoff here
@@ -105,7 +106,8 @@ class Manager:
         csr = self.private_key.generate_csr(self.domains)
 
         # finalize the order
-        order = self.client.finalize_order(order, csr)
+        finalize_url = order['finalize']
+        order = self.client.finalize_order(finalize_url, csr)
         pprint(order)
 
         # download the cert
@@ -115,10 +117,19 @@ class Manager:
         # replace certs in the cache
         self.cache.write(self.tls_cert_name, cert_pem)
 
+    def msg_callback(self, conn, direction, version, content_type, msg_type, data):
+        # early exit if not expecting a challenge
+        if not self.expecting_challenge:
+            return
+
+        # else look for 'acme-tls/1' in the raw stream
+        if direction == 'read' and b'acme-tls/1' in data:
+            self.acme_tls_challenge = True
+            log.info('!!! saw an acme-tls/1 request !!!')
+
     def sni_callback(self, sslsocket, sni_name, sslcontext):
         # early exit if not in a challenge
         if not self.acme_tls_challenge:
-            sslcontext.load_cert_chain(self.tls_cert_path, self.tls_pkey_path)
             return
 
         # ignore empty sni_name
@@ -132,19 +143,18 @@ class Manager:
         if not self.cache.exists(acme_cert_name):
             log.info('missing TLS-ALPN-01 challenge cert: %s', acme_cert_name)
 
+        # create an ephemeral SSLContext for the challenge response
+        ctx = ssl.create_default_context(purpose=ssl.Purpose.CLIENT_AUTH)
+        ctx.set_ciphers('ECDHE+AESGCM')
+        ctx.set_alpn_protocols(['acme-tls/1', 'http/1.1'])
+        ctx.options |= ssl.OP_NO_TLSv1 | ssl.OP_NO_TLSv1_1
+
         # serve up the TLS-ALPN-01 challenge cert
         acme_cert_path = self.cache.path(acme_cert_name)
-        sslcontext.load_cert_chain(acme_cert_path, self.tls_pkey_path)
+        ctx.load_cert_chain(acme_cert_path, self.tls_pkey_path)
+
+        # update the socket with the new context
+        sslsocket.context = ctx
 
         # reset acme_tls_challenge flag
         self.acme_tls_challenge = False
-
-    def msg_callback(self, conn, direction, version, content_type, msg_type, data):
-        # early exit if not expecting a challenge
-        if not self.expecting_challenge:
-            return
-
-        # else look for 'acme-tls/1' in the raw stream
-        if direction == 'read' and b'acme-tls/1' in data:
-            self.acme_tls_challenge = True
-            log.info('!!! saw an acme-tls/1 request !!!')

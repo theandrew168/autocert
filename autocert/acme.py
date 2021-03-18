@@ -61,10 +61,9 @@ class ACMEClient:
         resp = self._cmd(auth_url, None)
         return resp.json()
 
-    def verify_challenge(self, challenge):
-        log.info('verifying challenge: %s', challenge['url'])
-        url = challenge['url']
-        resp = self._cmd(url, {})
+    def verify_challenge(self, challenge_url):
+        log.info('verifying challenge: %s', challenge_url)
+        resp = self._cmd(challenge_url, {})
         return resp.json()
 
     def get_keyauth(self, token):
@@ -73,12 +72,11 @@ class ACMEClient:
         keyauth = keyauth.encode()
         return keyauth
 
-    def finalize_order(self, order, csr):
-        url = order['finalize']
+    def finalize_order(self, finalize_url, csr):
         payload = {
             'csr': utils.base64_rfc4648(csr),
         }
-        resp = self._cmd(url, payload)
+        resp = self._cmd(finalize_url, payload)
         return resp.json()
 
     def download_certificate(self, cert_url):
