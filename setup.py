@@ -5,7 +5,7 @@ with open('README.md') as f:
 
 setup(
     name='autocert',
-    version='0.0.3',
+    version='0.0.4',
     author='Andrew Dailey',
     description='Automatic TLS cert issuance and renewal for Python web apps',
     long_description=readme,
