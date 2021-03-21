@@ -9,10 +9,10 @@ from cryptography.hazmat.primitives import hashes, serialization
 from cryptography.hazmat.primitives.asymmetric import ec
 import requests
 
-from autocert import utils
 from autocert.errors import AutocertError
 from autocert.jwk import JWK
 from autocert.jws import JWS
+from autocert.rfc4648 import base64url
 
 #LETS_ENCRYPT_ACME_URL = 'https://acme-v02.api.letsencrypt.org/directory'
 LETS_ENCRYPT_ACME_URL = 'https://acme-staging-v02.api.letsencrypt.org/directory'
@@ -74,7 +74,7 @@ class ACMEClient:
 
     def finalize_order(self, finalize_url, csr):
         payload = {
-            'csr': utils.base64_rfc4648(csr),
+            'csr': base64url(csr),
         }
         resp = self._cmd(finalize_url, payload)
         return resp.json()

@@ -1,7 +1,7 @@
 import hashlib
 import json
 
-from autocert import utils
+from autocert.rfc4648 import base64url
 
 
 class JWK(dict):
@@ -10,8 +10,8 @@ class JWK(dict):
         jwk = {
             'kty': 'EC',
             'crv': public_key.curve,
-            'x': utils.base64_rfc4648(public_key.x),
-            'y': utils.base64_rfc4648(public_key.y),
+            'x': base64url(public_key.x),
+            'y': base64url(public_key.y),
         }
         super().__init__(jwk)
 
@@ -19,5 +19,5 @@ class JWK(dict):
         thumbprint = json.dumps(self, separators=(',', ':'), sort_keys=True)
         thumbprint = thumbprint.encode()
         thumbprint = hashlib.sha256(thumbprint).digest()
-        thumbprint = utils.base64_rfc4648(thumbprint)
+        thumbprint = base64url(thumbprint)
         return thumbprint

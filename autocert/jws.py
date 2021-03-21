@@ -1,6 +1,6 @@
 import json
 
-from autocert import utils
+from autocert.rfc4648 import base64url
 
 
 class JWS(dict):
@@ -25,7 +25,7 @@ class JWS(dict):
         signature = '{}.{}'.format(protected, payload)
         signature = signature.encode()
         signature = private_key.sign(signature)
-        signature = utils.base64_rfc4648(signature)
+        signature = base64url(signature)
 
         self['signature'] = signature
         return json.dumps(self, separators=(',', ':'))
@@ -47,7 +47,7 @@ class JWS(dict):
 
         protected = json.dumps(protected, separators=(',', ':'), sort_keys=True)
         protected = protected.encode()
-        protected = utils.base64_rfc4648(protected)
+        protected = base64url(protected)
         return protected
 
     def encode_payload(self, payload):
@@ -56,5 +56,5 @@ class JWS(dict):
 
         payload = json.dumps(payload, separators=(',', ':'), sort_keys=True)
         payload = payload.encode()
-        payload = utils.base64_rfc4648(payload)
+        payload = base64url(payload)
         return payload 

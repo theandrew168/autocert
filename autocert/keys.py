@@ -4,17 +4,27 @@ import logging
 
 from cryptography import x509
 from cryptography.hazmat.primitives import hashes, serialization
-from cryptography.hazmat.primitives.asymmetric import ec
-from cryptography.hazmat.primitives.asymmetric import utils as crypto_utils
+from cryptography.hazmat.primitives.asymmetric import ec, utils
 from cryptography.x509.oid import ExtendedKeyUsageOID, NameOID
-
-from autocert import utils
 
 # OID for the ACME extension for the TLS-ALPN challenge.
 # https://tools.ietf.org/html/draft-ietf-acme-tls-alpn-05#section-5.1
 ID_PE_ACME_IDENTIFIER = x509.ObjectIdentifier('1.3.6.1.5.5.7.1.31')
 
 log = logging.getLogger(__name__)
+
+
+def int_to_bytes(i):
+    return i.to_bytes((i.bit_length() + 7) // 8, byteorder='big')
+
+
+def bytes_to_der(b):
+    if len(b) >= 128:
+        raise ValueError('bytes_to_der only works for small bytes (< 128)')
+
+    octet_string = 0x04
+    header = [octet_string, len(b)]
+    return bytes(header) + b
 
 
 class PrivateKey:
@@ -36,9 +46,9 @@ class PrivateKey:
     def sign(self, data):
         # https://community.letsencrypt.org/t/parse-error-reading-jws/137654/13
         signature = self.key.sign(data, ec.ECDSA(hashes.SHA256()))
-        r, s = crypto_utils.decode_dss_signature(signature)
-        r = utils.int_to_bytes(r)
-        s = utils.int_to_bytes(s)
+        r, s = utils.decode_dss_signature(signature)
+        r = int_to_bytes(r)
+        s = int_to_bytes(s)
         signature = r + s
         return signature
 
@@ -96,7 +106,7 @@ class PrivateKey:
     def generate_tls_alpn_01_cert(self, domain, keyauth, ttl=timedelta(days=30)):
         # create the ACME identifier
         acme_identifier = hashlib.sha256(keyauth).digest()
-        acme_identifier = utils.bytes_to_der(acme_identifier)
+        acme_identifier = bytes_to_der(acme_identifier)
 
         # https://cryptography.io/en/latest/x509/reference.html#x-509-certificate-builder
         builder = x509.CertificateBuilder()
@@ -163,11 +173,11 @@ class PublicKey:
     @property
     def x(self):
         x = self.key.public_numbers().x
-        x = utils.int_to_bytes(x)
+        x = int_to_bytes(x)
         return x
 
     @property
     def y(self):
         y = self.key.public_numbers().y
-        y = utils.int_to_bytes(y)
+        y = int_to_bytes(y)
         return y
