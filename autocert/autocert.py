@@ -73,7 +73,7 @@ def manage(sock, *domains, contact=None, accept_tos=False):
 
     # init ACME client and cert manager
     client = ACMEClient(account_pkey, contact=contact, accept_tos=accept_tos)
-    manager = Manager(tls_pkey, context, cache, domains, client)
+    manager = Manager(tls_pkey, ctx, cache, domains, client)
 
     # hook manager into the context
     ctx._msg_callback = manager.msg_callback
