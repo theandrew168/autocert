@@ -147,9 +147,9 @@ class Manager:
 
         # create an ephemeral SSLContext for the challenge response
         ctx = ssl.create_default_context(purpose=ssl.Purpose.CLIENT_AUTH)
-        ctx.set_ciphers('ECDHE+AESGCM')
+        #ctx.set_ciphers('ECDHE+AESGCM')
         ctx.set_alpn_protocols(['acme-tls/1'])
-        ctx.options |= ssl.OP_NO_TLSv1 | ssl.OP_NO_TLSv1_1
+        #ctx.options |= ssl.OP_NO_TLSv1 | ssl.OP_NO_TLSv1_1
 
         # fix deadlock until updates come through
         ctx._msg_callback = self.msg_callback
