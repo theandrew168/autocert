@@ -1,0 +1,15 @@
+https://tools.ietf.org/html/rfc8555
+https://github.com/letsencrypt/boulder/blob/master/docs/acme-divergences.md
+
+https://github.com/golang/crypto/tree/master/acme/autocert
+https://github.com/farrepa/django-autocert/tree/develop/autocert
+https://github.com/diafygi/acme-tiny
+https://github.com/caddyserver/certmagic
+https://github.com/mholt/acmez
+
+https://docs.python.org/3/library/socket.html
+https://docs.python.org/3/library/ssl.html
+
+https://github.com/dehydrated-io/dehydrated/blob/master/docs/tls-alpn.md
+https://fossies.org/linux/ansible/lib/ansible/modules/crypto/acme/acme_challenge_cert_helper.py
+https://sites.lafayette.edu/fultonc/2019/02/03/using-tls-alpn-01-on-a-raspberry-pi/

@@ -143,11 +143,12 @@ class Manager:
         acme_cert_name = sni_name + '.acme.cert'
         if not self.cache.exists(acme_cert_name):
             log.info('missing TLS-ALPN-01 challenge cert: %s', acme_cert_name)
+            return
 
         # create an ephemeral SSLContext for the challenge response
         ctx = ssl.create_default_context(purpose=ssl.Purpose.CLIENT_AUTH)
         ctx.set_ciphers('ECDHE+AESGCM')
-        ctx.set_alpn_protocols(['acme-tls/1'])
+        ctx.set_alpn_protocols(['acme-tls/1', 'http/1.1'])
         ctx.options |= ssl.OP_NO_TLSv1 | ssl.OP_NO_TLSv1_1
 
         # serve up the TLS-ALPN-01 challenge cert
