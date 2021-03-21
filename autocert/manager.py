@@ -12,8 +12,9 @@ log = logging.getLogger(__name__)
 
 class Manager:
 
-    def __init__(self, private_key, cache, domains, client):
+    def __init__(self, private_key, context, cache, domains, client):
         self.private_key = private_key
+        self.context = context
         self.cache = cache
         self.domains = domains
         self.client = client
@@ -118,6 +119,9 @@ class Manager:
         # replace certs in the cache
         self.cache.write(self.tls_cert_name, cert_pem)
 
+        # update the managed SSLContext with the new cert chain
+        self.context.load_cert_chain(self.tls_cert_path, self.tls_pkey_path)
+
     def msg_callback(self, conn, direction, version, content_type, msg_type, data):
         # early exit if not expecting a challenge
         if not self.expecting_challenge:
@@ -147,11 +151,9 @@ class Manager:
 
         # create an ephemeral SSLContext for the challenge response
         ctx = ssl.create_default_context(purpose=ssl.Purpose.CLIENT_AUTH)
-        #ctx.set_ciphers('ECDHE+AESGCM')
         ctx.set_alpn_protocols(['acme-tls/1'])
-        #ctx.options |= ssl.OP_NO_TLSv1 | ssl.OP_NO_TLSv1_1
 
-        # fix deadlock until updates come through
+        # HACK: fix deadlock until updates come through
         ctx._msg_callback = self.msg_callback
 
         # serve up the TLS-ALPN-01 challenge cert

@@ -65,8 +65,6 @@ def manage(sock, *domains, contact=None, accept_tos=False):
 
     # create ssl context w/ modern ciphers/options
     ctx = ssl.create_default_context(purpose=ssl.Purpose.CLIENT_AUTH)
-    #ctx.set_ciphers('ECDHE+AESGCM')
-    #ctx.options |= ssl.OP_NO_TLSv1 | ssl.OP_NO_TLSv1_1
 
     # SSLContext.load_cert_chain wants real files :(
     tls_pkey_path = cache.path(tls_pkey_name)
@@ -75,7 +73,7 @@ def manage(sock, *domains, contact=None, accept_tos=False):
 
     # init ACME client and cert manager
     client = ACMEClient(account_pkey, contact=contact, accept_tos=accept_tos)
-    manager = Manager(tls_pkey, cache, domains, client)
+    manager = Manager(tls_pkey, context, cache, domains, client)
 
     # hook manager into the context
     ctx._msg_callback = manager.msg_callback
