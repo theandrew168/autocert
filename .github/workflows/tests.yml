@@ -3,20 +3,12 @@ name: Tests
 on: [push, pull_request]
 
 jobs:
-  tests:
 
+  unit_tests:
     strategy:
       matrix:
         os: [macos-latest, ubuntu-latest, windows-latest]
         python-version: [3.7, 3.8, 3.9]
-
-    services:
-      pebble:
-        image: letsencrypt/pebble
-        env:
-          PEBBLE_VA_NOSLEEP: 1
-        ports:
-          - 14000:14000
 
     runs-on: ${{ matrix.os }}
     steps:
@@ -32,7 +24,33 @@ jobs:
     - name: unit tests ${{ matrix.os }} - ${{ matrix.python-version }}
       run: |
         pytest tests/unit/
-    - name: integration tests ${{ matrix.os }} - ${{ matrix.python-version }}
+
+  integration_tests:
+    runs-on: ubuntu-latest
+
+    strategy:
+      matrix:
+        python-version: [3.7, 3.8, 3.9]
+
+    services:
+      pebble:
+        image: letsencrypt/pebble
+        env:
+          PEBBLE_VA_NOSLEEP: 1
+        ports:
+          - 14000:14000
+
+    steps:
+    - uses: actions/checkout@v2
+    - uses: actions/setup-python@v2
+      with:
+        python-version: ${{ matrix.python-version }}
+    - name: dependencies
+      run: |
+        pip install wheel
+        pip install pytest
+        python3 setup.py install
+    - name: integration tests ${{ matrix.python-version }}
       run: |
         pytest tests/integration/
       env:
