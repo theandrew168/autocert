@@ -21,6 +21,9 @@ jobs:
         pip install wheel
         pip install pytest
         python3 setup.py install
-    - name: pytest ${{ matrix.os }} - ${{ matrix.python-version }}
+    - name: unit tests ${{ matrix.os }} - ${{ matrix.python-version }}
       run: |
-        pytest
+        pytest tests/unit/
+    - name: integration tests ${{ matrix.os }} - ${{ matrix.python-version }}
+      run: |
+        pytest tests/integration/
