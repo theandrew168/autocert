@@ -82,3 +82,28 @@ s443_tls = autocert.manage(s443, 'example.org', 'www.example.org', accept_tos=Tr
 # serve your app with TLS!
 waitress.serve(wsgi.hello_world_app, sockets=[s443_tls], url_scheme='https')
 ```
+
+## Testing
+Autocert is tested using [pytest](). Unit tests can be executed without anything special but the integration tests expect a locally-running ACME server. Running [pebble]() in a container is a great way to accomplish this!
+
+To run the tests, first install pytest:
+```
+pip install pytest
+```
+
+Then, unit tests can be ran via:
+```
+pytest tests/unit/
+```
+
+The integration tests need that local ACME server so let's start it up and set some necessary vars:
+```
+docker run -e PEBBLE_VA_NOSLEEP=1 -p 14000:14000 --detach letsencrypt/pebble
+export AUTOCERT_ACME_SERVER_DIRECTORY=https:localhost:14000/dir
+export AUTOCERT_SSL_NO_VERIFY=1
+```
+
+Now the integration tests can be ran:
+```
+pytest tests/integration/
+```
