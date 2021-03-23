@@ -100,7 +100,6 @@ The integration tests need that local ACME server so let's start it up and set s
 ```
 docker run -p 14000:14000 --detach letsencrypt/pebble
 export AUTOCERT_ACME_SERVER_DIRECTORY=https://localhost:14000/dir
-export AUTOCERT_SSL_NO_VERIFY=1
 ```
 
 Now the integration tests can be ran:
