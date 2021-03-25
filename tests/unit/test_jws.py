@@ -2,6 +2,8 @@ from autocert.jwk import JWK
 from autocert.jws import JWS
 from autocert.keys import PrivateKey
 
+import pytest
+
 
 def test_sign_with_jwk():
     pkey = PrivateKey()
@@ -55,3 +57,11 @@ def test_sign_with_empty_payload():
     assert 'protected' in jws
     assert 'payload' in jws
     assert 'signature' in jws
+
+
+def test_missing_jwk_and_kid():
+    url = 'http://example.org'
+    payload = None
+    nonce = 'abc123nonce'
+    with pytest.raises(ValueError):
+        jws = JWS(url, payload, nonce)

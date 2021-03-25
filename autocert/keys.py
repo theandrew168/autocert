@@ -14,10 +14,6 @@ ID_PE_ACME_IDENTIFIER = x509.ObjectIdentifier('1.3.6.1.5.5.7.1.31')
 log = logging.getLogger(__name__)
 
 
-def int_to_bytes(i):
-    return i.to_bytes((i.bit_length() + 7) // 8, byteorder='big')
-
-
 def bytes_to_der(b):
     if len(b) >= 128:
         raise ValueError('bytes_to_der only works for small bytes (< 128)')
@@ -25,6 +21,19 @@ def bytes_to_der(b):
     octet_string = 0x04
     header = [octet_string, len(b)]
     return bytes(header) + b
+
+
+def int_to_bytes(i):
+    if i == 0:
+        return b'\x00'
+
+    return i.to_bytes((i.bit_length() + 7) // 8, byteorder='big')
+
+
+def keyauth_to_acme_identifier(keyauth):
+    acme_identifier = hashlib.sha256(keyauth).digest()
+    acme_identifier = bytes_to_der(acme_identifier)
+    return acme_identifier
 
 
 class PrivateKey:
@@ -105,8 +114,7 @@ class PrivateKey:
 
     def generate_tls_alpn_01_cert(self, domain, keyauth, ttl=timedelta(days=30)):
         # create the ACME identifier
-        acme_identifier = hashlib.sha256(keyauth).digest()
-        acme_identifier = bytes_to_der(acme_identifier)
+        acme_identifier = keyauth_to_acme_identifier(keyauth)
 
         # https://cryptography.io/en/latest/x509/reference.html#x-509-certificate-builder
         builder = x509.CertificateBuilder()

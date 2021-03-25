@@ -6,9 +6,6 @@ from autocert.rfc4648 import base64url
 class JWS(dict):
 
     def __init__(self, url, payload, nonce, jwk=None, kid=None):
-        if jwk is None and kid is None:
-            raise ValueError('either "jwk" or "kid" must be specified')
-
         protected = self.encode_protected(url, nonce, jwk=jwk, kid=kid)
         payload = self.encode_payload(payload)
         jws = {
