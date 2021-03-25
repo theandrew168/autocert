@@ -15,6 +15,7 @@ def redirect_app(environ, start_response):
     return [b'']
 
 
+# Based on:
 # https://www.python.org/dev/peps/pep-3333/#url-reconstruction
 def reconstruct_https_url(environ):
     url = 'https://'
@@ -23,13 +24,8 @@ def reconstruct_https_url(environ):
         url += environ['HTTP_HOST']
     else:
         url += environ['SERVER_NAME']
-
-        if environ['wsgi.url_scheme'] == 'https':
-            if environ['SERVER_PORT'] != '443':
-               url += ':' + environ['SERVER_PORT']
-        else:
-            if environ['SERVER_PORT'] != '80':
-               url += ':' + environ['SERVER_PORT']
+        if environ['SERVER_PORT'] != '443':
+            url += ':' + environ['SERVER_PORT']
 
     url += quote(environ.get('SCRIPT_NAME', ''))
     url += quote(environ.get('PATH_INFO', ''))
