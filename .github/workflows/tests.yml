@@ -53,6 +53,3 @@ jobs:
     - name: integration tests ${{ matrix.python-version }}
       run: |
         pytest tests/integration/
-      env:
-        AUTOCERT_ACME_SERVER_DIRECTORY: https://localhost:14000/dir
-        AUTOCERT_SSL_NO_VERIFY: 1

@@ -99,7 +99,6 @@ pytest tests/unit/
 The integration tests need that local ACME server so let's start it up and set some necessary vars:
 ```
 docker run -p 14000:14000 --detach letsencrypt/pebble
-export AUTOCERT_ACME_SERVER_DIRECTORY=https://localhost:14000/dir
 ```
 
 Now the integration tests can be ran:

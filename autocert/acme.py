@@ -1,5 +1,6 @@
 from datetime import datetime, timedelta, timezone
 import hashlib
+from importlib import resources
 import logging
 import os
 
@@ -36,9 +37,16 @@ class ACMEClient:
         self.accept_tos = accept_tos
         self.directory_url = directory_url
 
+        # use pebble's cert if directory_url contains localhost else use normal behavior
+        self.verify_tls = True
+        if 'localhost' in directory_url:
+            with resources.path('autocert.certs', 'pebble.minica.pem') as pebble_pem_path:
+                self.verify_tls = str(pebble_pem_path)
+
         # grab current directory and initial nonce
-        self.directory = requests.get(self.directory_url).json()
-        self.nonce = requests.head(self.directory['newNonce']).headers['Replay-Nonce']
+        self.directory = requests.get(self.directory_url, verify=self.verify_tls).json()
+        self.nonce = requests.head(self.directory['newNonce'], verify=self.verify_tls)
+        self.nonce = self.nonce.headers['Replay-Nonce']
 
         # load existing ACME account or create a new one
         acct = self._create_or_read_account()
@@ -115,7 +123,7 @@ class ACMEClient:
         jws = jws.sign(self.private_key)
 
         # post message to the ACME server
-        resp = requests.post(url, headers=headers, data=jws)
+        resp = requests.post(url, headers=headers, data=jws, verify=self.verify_tls)
         if resp.status_code not in [200, 201, 204]:
             # TODO: if bad nonce, get another and retry
             log.error('jws: %s', jws)
