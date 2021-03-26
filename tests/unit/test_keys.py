@@ -1,10 +1,10 @@
-from autocert.keys import ID_PE_ACME_IDENTIFIER
-from autocert.keys import bytes_to_der, int_to_bytes, keyauth_to_acme_identifier
-from autocert.keys import PrivateKey, PublicKey
-
 from cryptography import x509
 from cryptography.x509 import oid
 import pytest
+
+from autocert.keys import ID_PE_ACME_IDENTIFIER
+from autocert.keys import bytes_to_der, int_to_bytes, keyauth_to_acme_identifier
+from autocert.keys import PrivateKey, PublicKey
 
 
 @pytest.mark.parametrize(

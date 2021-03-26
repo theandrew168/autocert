@@ -35,12 +35,13 @@ jobs:
     services:
       pebble:
         image: letsencrypt/pebble
-        env:
-          PEBBLE_VA_NOSLEEP: 1
         ports:
           - 14000:14000
 
     steps:
+    - name: setup localhost aliases
+      run: |
+        echo "127.0.0.1 autocert.example.org www.autocert.example.org" | sudo tee -a /etc/hosts
     - uses: actions/checkout@v2
     - uses: actions/setup-python@v2
       with:

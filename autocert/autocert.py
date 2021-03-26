@@ -8,7 +8,6 @@ import appdirs
 
 from autocert.acme import ACMEClient
 from autocert.cache import Cache
-from autocert.errors import AutocertError
 from autocert.keys import PrivateKey
 from autocert.manager import Manager
 
@@ -16,12 +15,6 @@ log = logging.getLogger(__name__)
 
 
 def manage(sock, *domains, contact=None, accept_tos=False):
-    # ensure args are valid
-    if not accept_tos:
-        raise AutocertError("CA's Terms of Service must be accepted")
-    if not isinstance(sock, socket.socket):
-        raise AutocertError('Socket sock must be a socket')
-
     # if contact email is just a string, make it a single-element list
     if type(contact) == str:
         contact = [contact]

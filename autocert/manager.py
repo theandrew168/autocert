@@ -5,8 +5,6 @@ import time
 
 from cryptography import x509
 
-from autocert.errors import AutocertError
-
 log = logging.getLogger(__name__)
 
 
@@ -102,7 +100,7 @@ class Manager:
 
             # at this point, we either failed or passed the challenge
             if auth['status'] != 'valid':
-                raise AutocertError('failed to satisfy ACME challenge: {}'.format(auth))
+                raise RuntimeError('failed to satisfy ACME challenge: {}'.format(auth))
 
         # generate CSR for new cert
         csr = self.private_key.generate_csr(self.domains)

@@ -1,8 +1,8 @@
+import pytest
+
 from autocert.jwk import JWK
 from autocert.jws import JWS
 from autocert.keys import PrivateKey
-
-import pytest
 
 
 def test_sign_with_jwk():

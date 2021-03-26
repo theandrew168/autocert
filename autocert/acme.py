@@ -1,6 +1,5 @@
 from datetime import datetime, timedelta, timezone
 import hashlib
-from importlib import resources
 import logging
 import os
 
@@ -10,48 +9,65 @@ from cryptography.hazmat.primitives import hashes, serialization
 from cryptography.hazmat.primitives.asymmetric import ec
 import requests
 
-from autocert.errors import AutocertError
 from autocert.jwk import JWK
 from autocert.jws import JWS
 from autocert.rfc4648 import base64url
 
-#LETS_ENCRYPT_ACME_URL = 'https://acme-v02.api.letsencrypt.org/directory'
-LETS_ENCRYPT_ACME_URL = 'https://acme-staging-v02.api.letsencrypt.org/directory'
+LETS_ENCRYPT_DIRECTORY_URL = 'https://acme-v02.api.letsencrypt.org/directory'
+LETS_ENCRYPT_STAGING_DIRECTORY_URL = 'https://acme-staging-v02.api.letsencrypt.org/directory'
+ACME_ERROR_BAD_NONCE = 'urn:ietf:params:acme:error:badNonce'
+ACME_ERROR_MALFORMED = 'urn:ietf:params:acme:error:malformed'
+ACME_ERROR_ORDER_NOT_READY = 'urn:ietf:params:acme:error:orderNotReady'
+
 
 log = logging.getLogger(__name__)
 
 
+class ACMEServerError(Exception):
+    pass
+
+
+class ACMEOrderNotReady(ACMEServerError):
+    pass
+
+
 class ACMEClient:
 
-    def __init__(self, private_key, contact=None, accept_tos=False, directory_url=LETS_ENCRYPT_ACME_URL):
-        if not accept_tos:
-            raise AutocertError("CA's Terms of Service must be accepted")
-
+    def __init__(self, private_key, contact=None, accept_tos=False, directory_url=LETS_ENCRYPT_DIRECTORY_URL):
         # initial ACME credentials
         self.private_key = private_key
         self.jwk = JWK(private_key.public_key)
         self.kid = None
 
         # other ACME details
-        self.contact = contact
+        if type(contact) == str:
+            self.contact = [contact]
+        else:
+            self.contact = contact
         self.accept_tos = accept_tos
         self.directory_url = directory_url
 
         # use pebble's cert if directory_url contains localhost else use normal behavior
         self.verify_tls = True
         if 'localhost' in directory_url:
-            with resources.path('autocert.certs', 'pebble.minica.pem') as pebble_pem_path:
-                self.verify_tls = str(pebble_pem_path)
+            autocert_path = os.path.dirname(os.path.abspath(__file__))
+            pebble_cert_path = os.path.join(autocert_path, 'certs', 'pebble.minica.pem')
+            self.verify_tls = pebble_cert_path
 
         # grab current directory and initial nonce
-        self.directory = requests.get(self.directory_url, verify=self.verify_tls).json()
-        self.nonce = requests.head(self.directory['newNonce'], verify=self.verify_tls)
-        self.nonce = self.nonce.headers['Replay-Nonce']
+        self.directory = self._get_directory()
+        self.nonce = self._get_nonce()
 
         # load existing ACME account or create a new one
         acct = self._create_or_read_account()
         self.kid = acct.headers['Location']
         log.info('initialized account kid: %s', self.kid)
+
+    def get_keyauth(self, token):
+        thumbprint = self.jwk.thumbprint()
+        keyauth = '{}.{}'.format(token, thumbprint)
+        keyauth = keyauth.encode()
+        return keyauth
 
     def create_order(self, domains):
         log.info('creating order for domains: %s', domains)
@@ -74,12 +90,6 @@ class ACMEClient:
         resp = self._cmd(challenge_url, {})
         return resp.json()
 
-    def get_keyauth(self, token):
-        thumbprint = self.jwk.thumbprint()
-        keyauth = '{}.{}'.format(token, thumbprint)
-        keyauth = keyauth.encode()
-        return keyauth
-
     def finalize_order(self, finalize_url, csr):
         payload = {
             'csr': base64url(csr),
@@ -90,6 +100,16 @@ class ACMEClient:
     def download_certificate(self, cert_url):
         resp = self._cmd(cert_url, None)
         return resp.content
+
+    def _get_directory(self):
+        directory = requests.get(self.directory_url, verify=self.verify_tls)
+        directory = directory.json()
+        return directory
+
+    def _get_nonce(self):
+        nonce = requests.head(self.directory['newNonce'], verify=self.verify_tls)
+        nonce = nonce.headers['Replay-Nonce']
+        return nonce
 
     def _create_or_read_account(self):
         url = self.directory['newAccount']
@@ -125,12 +145,17 @@ class ACMEClient:
         # post message to the ACME server
         resp = requests.post(url, headers=headers, data=jws, verify=self.verify_tls)
         if resp.status_code not in [200, 201, 204]:
-            # TODO: if bad nonce, get another and retry
-            log.error('jws: %s', jws)
-            log.error('url: %s', url)
-            log.error('pay: %s', payload)
-            log.error('nonce: %s', self.nonce)
-            raise AutocertError('ACME error: {}'.format(resp.json()))
+            resp = resp.json()
+
+            # if bad / malformed nonce, get another and retry
+            if resp['type'] in [ACME_ERROR_BAD_NONCE, ACME_ERROR_MALFORMED]:
+                self.nonce = self._get_nonce()
+                return self._cmd(url, payload)
+
+            if resp['type'] == ACME_ERROR_ORDER_NOT_READY:
+                raise ACMEOrderNotReady()
+
+            raise ACMEServerError(resp)
 
         # update nonce
         self.nonce = resp.headers['Replay-Nonce']

@@ -1,14 +1,40 @@
+from wsgiref.simple_server import make_server
+
+import requests
+
+from autocert.wsgi import BackgroundWSGIServer, reconstruct_https_url
 from autocert.wsgi import hello_world_app, redirect_app
-from autocert.wsgi import reconstruct_https_url
+
+
+def test_hello_world_app():
+    with make_server('127.0.0.1', 0, hello_world_app, server_class=BackgroundWSGIServer) as httpd:
+        host, port = httpd.server_address
+        url = 'http://{}:{}'.format(host, port)
+
+        resp = requests.get(url)
+        assert resp.status_code == 200
+        assert 'autocert' in resp.text
+
+
+def test_redirect_app():
+    with make_server('127.0.0.1', 0, redirect_app, server_class=BackgroundWSGIServer) as httpd:
+        host, port = httpd.server_address
+        url = 'http://{}:{}'.format(host, port)
+
+        resp = requests.get(url, allow_redirects=False)
+        assert resp.status_code == 301
+        location = resp.headers['Location']
+        assert location == 'https://{}:{}/'.format(host, port)
 
 
 def test_reconstruct_https_url_basic():
     environ = {
         'HTTP_HOST': 'example.org',
+        'PATH_INFO': '/',
     }
 
     url = reconstruct_https_url(environ)
-    assert url == 'https://example.org'
+    assert url == 'https://example.org/'
 
 
 def test_reconstruct_https_url_path():
