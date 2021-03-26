@@ -20,7 +20,7 @@ jobs:
       run: |
         pip install wheel
         pip install pytest
-        python3 setup.py install
+        pip install -e .
     - name: unit tests ${{ matrix.os }} - ${{ matrix.python-version }}
       run: |
         pytest tests/unit/
@@ -50,7 +50,7 @@ jobs:
       run: |
         pip install wheel
         pip install pytest
-        python3 setup.py install
+        pip install -e .
     - name: integration tests ${{ matrix.python-version }}
       run: |
         pytest tests/integration/
