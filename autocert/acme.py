@@ -1,7 +1,8 @@
 from datetime import datetime, timedelta, timezone
 import hashlib
 import logging
-import os
+import pkgutil
+import tempfile
 
 import appdirs
 from cryptography import x509
@@ -50,9 +51,10 @@ class ACMEClient:
         # use pebble's cert if directory_url contains localhost else use normal behavior
         self.verify_tls = True
         if 'localhost' in directory_url:
-            autocert_path = os.path.dirname(os.path.abspath(__file__))
-            pebble_cert_path = os.path.join(autocert_path, 'certs', 'pebble.minica.pem')
-            self.verify_tls = pebble_cert_path
+            pebble_cert = pkgutil.get_data(__package__, 'pebble.minica.pem')
+            with tempfile.NamedTemporaryFile(delete=False) as f:
+                f.write(pebble_cert)
+                self.verify_tls = f.name
 
         # grab current directory and initial nonce
         self.directory = self._get_directory()
