@@ -7,6 +7,17 @@ It is based on the API and design of the [Go](https://golang.org/) package with 
 To work its magic, autocert only requires a single TCP socket listening on your desired HTTPS port (usually 443).
 This can come directly from an application or from a management system such as [systemd](https://www.freedesktop.org/software/systemd/man/systemd.socket.html).
 
+## Motivation
+I often find myself with the need to host simple Python web apps as demos for friends / clients.
+In these situations, I want the demo to be properly secured via HTTPS but I don't want to worry about the extra infrastructure that comes with setting up a reverse proxy (NGINX, Caddy, etc).
+This library allows you to add an auto-renewing TLS certificate [Let's Encrypt](https://letsencrypt.org/) to your website with a single line of code.
+
+There is quite a bit of dogma surrounding the hosting of Python-based web applications.
+Most folks believe that utilizing a [reverse proxy](https://en.wikipedia.org/wiki/Reverse_proxy) is a hard requirement for achieving a secure, fast, and reliable deployment.
+Some cite "performance" and others cite "safety" but I've never really been 100% convinced.
+I really like the simplicity of hosting a [Flask](https://flask.palletsprojects.com/en/1.1.x/) or [Django](https://www.djangoproject.com/) app by combining a pure-Python [WSGI server](https://www.python.org/dev/peps/pep-3333/) (such as [Waitress](https://docs.pylonsproject.org/projects/waitress/en/stable/)) with this project.
+It might not be the best deployment option for a high-traffic, business-critical application but it can easily support a few hundred requests per second on a small [Digital Ocean](https://www.digitalocean.com/) droplet.
+
 ## Install
 If you are unfamiliar with [virtual environments](https://docs.python.org/3/library/venv.html), I suggest taking a brief moment to learn about them and set one up.
 The Python docs provide a great [tutorial](https://docs.python.org/3/tutorial/venv.html) for getting started with virtual environments and packages.
@@ -17,7 +28,7 @@ pip install autocert
 ```
 
 ## Examples
-These examples utilize the [waitress](https://docs.pylonsproject.org/projects/waitress/en/stable/) WSGI server but you can follow your own preference.
+These examples utilize the [Waitress](https://docs.pylonsproject.org/projects/waitress/en/stable/) WSGI server but you can follow your own preference.
 However, whichever server you choose must be able to accept pre-listening sockets (you'll see what I mean).
 More examples can be found in the [examples directory](https://github.com/theandrew168/autocert/tree/main/examples).
 
