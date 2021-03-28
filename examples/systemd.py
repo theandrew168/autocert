@@ -4,11 +4,11 @@ import socket
 import waitress
 
 # make sure systemd PID matches
-if os.environ['LISTEN_PID'] != os.getpid():
+if os.environ['LISTEN_PID'] != str(os.getpid()):
     raise SystemExit('Mismatched LISTEN_PID')
 
 # expecting 1 port here: 443
-if os.environ['LISTEN_FDS'] != 1:
+if os.environ['LISTEN_FDS'] != '1':
     raise SystemExit('Expected 1 socket fd for port 443')
 
 # create socket from the fd opened by systemd

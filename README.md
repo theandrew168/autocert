@@ -66,11 +66,11 @@ import threading
 import waitress
 
 # make sure systemd PID matches
-if os.environ['LISTEN_PID'] != os.getpid():
+if os.environ['LISTEN_PID'] != str(os.getpid()):
     raise SystemExit('Mismatched LISTEN_PID')
 
 # expecting 2 ports here: 80, 443
-if os.environ['LISTEN_FDS'] != 2:
+if os.environ['LISTEN_FDS'] != '2':
     raise SystemExit('Expected 2 socket fds for ports 80 and 443')
 
 # create sockets from the fds opened by systemd
