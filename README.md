@@ -14,8 +14,7 @@ This library allows you to add an auto-renewing TLS certificate from [Let's Encr
 
 There is quite a bit of dogma surrounding the hosting of Python-based web applications.
 Most folks believe that utilizing a [reverse proxy](https://en.wikipedia.org/wiki/Reverse_proxy) is a hard requirement for achieving a secure, fast, and reliable deployment.
-Some cite "performance" and others cite "safety" but I've never really been 100% convinced.
-I really like the simplicity of hosting a [Flask](https://flask.palletsprojects.com/en/1.1.x/) or [Django](https://www.djangoproject.com/) app by combining a pure-Python [WSGI server](https://www.python.org/dev/peps/pep-3333/) (such as [Waitress](https://docs.pylonsproject.org/projects/waitress/en/stable/)) with this project.
+However, I really like the simplicity of hosting a [Flask](https://flask.palletsprojects.com/en/1.1.x/) or [Django](https://www.djangoproject.com/) app by combining a pure-Python [WSGI server](https://www.python.org/dev/peps/pep-3333/) (such as [Waitress](https://docs.pylonsproject.org/projects/waitress/en/stable/)) with this project.
 It might not be the best deployment option for a high-traffic, business-critical applications but it can easily support a few hundred requests per second on a small [Digital Ocean](https://www.digitalocean.com/) droplet.
 
 ## Install
