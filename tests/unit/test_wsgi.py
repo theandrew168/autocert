@@ -1,9 +1,28 @@
-from wsgiref.simple_server import make_server
+import threading
+from wsgiref.simple_server import make_server, WSGIServer
 
 import requests
 
-from autocert.wsgi import BackgroundWSGIServer, reconstruct_https_url
 from autocert.wsgi import hello_world_app, redirect_app
+from autocert.wsgi import reconstruct_https_url
+
+
+class BackgroundWSGIServer(WSGIServer):
+
+    def __init__(self, *args, **kwargs):
+        super().__init__(*args, **kwargs)
+        self.thread = None
+
+    def __enter__(self):
+        super().__enter__()
+        self.thread = threading.Thread(target=self.serve_forever)
+        self.thread.start()
+        return self
+
+    def __exit__(self, *args):
+        super().__exit__(*args)
+        self.shutdown()
+        self.thread.join()
 
 
 def test_hello_world_app():

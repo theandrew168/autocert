@@ -1,24 +1,4 @@
-import threading
 from urllib.parse import quote
-from wsgiref.simple_server import WSGIServer
-
-
-class BackgroundWSGIServer(WSGIServer):
-
-    def __init__(self, *args, **kwargs):
-        super().__init__(*args, **kwargs)
-        self.thread = None
-
-    def __enter__(self):
-        super().__enter__()
-        self.thread = threading.Thread(target=self.serve_forever)
-        self.thread.start()
-        return self
-
-    def __exit__(self, *args):
-        super().__exit__(*args)
-        self.shutdown()
-        self.thread.join()
 
 
 def hello_world_app(environ, start_response):
