@@ -5,6 +5,8 @@ import time
 
 from cryptography import x509
 
+from autocert.acme import ACMEServerError
+
 log = logging.getLogger(__name__)
 
 
@@ -52,19 +54,21 @@ class Manager:
 
             # time to issue / renew
             log.info('time is up, renewing cert for: %s', self.domains)
-            self.issue_and_renew()
+            try:
+                self.issue_and_renew()
+            except Exception as e:
+                log.info('error issuing / renewing cert:')
+                log.info(e)
+                log.info('trying again in 24 hours')
+                time.sleep(timedelta(hours=24).total_seconds())
 
     def issue_and_renew(self):
-        from pprint import pprint
-
         # TODO: check if order['status'] isn't pending for some reason
         order = self.client.create_order(self.domains)
-        pprint(order)
 
         auth_urls = order['authorizations']
         for auth_url in auth_urls:
             auth = self.client.get_authorization(auth_url)
-            pprint(auth)
 
             # pull out the domain and TLS-ALPN-01 challenge
             domain = auth['identifier']['value']
@@ -87,20 +91,19 @@ class Manager:
             self.client.verify_challenge(challenge_url)
 
             # poll til status isn't pending anymore
-            # TODO: smarter backoff here
+            attempts = 5
             auth = self.client.get_authorization(auth_url)
-            while auth['status'] == 'pending':
+            while auth['status'] == 'pending' and attempts > 0:
                 time.sleep(1)
                 auth = self.client.get_authorization(auth_url)
+                attempts -= 1
 
             # challenge is over
             self.expecting_challenge = False
 
-            pprint(auth)
-
             # at this point, we either failed or passed the challenge
             if auth['status'] != 'valid':
-                raise RuntimeError('failed to satisfy ACME challenge: {}'.format(auth))
+                raise ACMEServerError(auth)
 
         # generate CSR for new cert
         csr = self.private_key.generate_csr(self.domains)
@@ -108,7 +111,6 @@ class Manager:
         # finalize the order
         finalize_url = order['finalize']
         order = self.client.finalize_order(finalize_url, csr)
-        pprint(order)
 
         # download the cert
         cert_url = order['certificate']
