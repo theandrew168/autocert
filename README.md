@@ -1,4 +1,6 @@
 # autocert
+[![FOSSA Status](https://app.fossa.com/api/projects/git%2Bgithub.com%2Ftheandrew168%2Fautocert.svg?type=shield)](https://app.fossa.com/projects/git%2Bgithub.com%2Ftheandrew168%2Fautocert?ref=badge_shield)
+
 Automatic TLS cert issuance and renewal for Python web apps
 
 ## Overview
@@ -115,3 +117,7 @@ Now the integration tests can be ran:
 ```
 pytest tests/integration/
 ```
+
+
+## License
+[![FOSSA Status](https://app.fossa.com/api/projects/git%2Bgithub.com%2Ftheandrew168%2Fautocert.svg?type=large)](https://app.fossa.com/projects/git%2Bgithub.com%2Ftheandrew168%2Fautocert?ref=badge_large)
